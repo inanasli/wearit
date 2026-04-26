@@ -6,19 +6,36 @@ interface ClothingCardProps {
 
 export default function ClothingCard({ item }: ClothingCardProps) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-      <img
-        src={item.imageUrl}
-        alt={item.name}
-        className="h-64 w-full object-cover"
+    <article className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm">
+      <div
+        aria-label={item.name}
+        className="h-64 bg-cover bg-center"
+        role="img"
+        style={{ backgroundImage: `url(${item.imageUrl})` }}
       />
 
       <div className="p-4">
-        <h3 className="text-lg font-semibold text-black">{item.name}</h3>
-        <p className="mt-1 text-sm text-gray-700">Kategori: {item.category}</p>
-        <p className="text-sm text-gray-700">Renk: {item.color}</p>
-        <p className="text-sm text-gray-700">Mevsim: {item.season}</p>
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="text-lg font-black text-zinc-950">{item.name}</h3>
+          <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-black text-zinc-700">
+            {item.style}
+          </span>
+        </div>
+        <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
+          <div className="rounded-xl bg-[#f7f5f0] p-3">
+            <p className="text-xs font-bold text-zinc-500">Kategori</p>
+            <p className="font-black text-zinc-900">{item.category}</p>
+          </div>
+          <div className="rounded-xl bg-[#f7f5f0] p-3">
+            <p className="text-xs font-bold text-zinc-500">Renk</p>
+            <p className="font-black text-zinc-900">{item.color}</p>
+          </div>
+          <div className="rounded-xl bg-[#f7f5f0] p-3">
+            <p className="text-xs font-bold text-zinc-500">Mevsim</p>
+            <p className="font-black text-zinc-900">{item.season}</p>
+          </div>
+        </div>
       </div>
-    </div>
+    </article>
   );
 }

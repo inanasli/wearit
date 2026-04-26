@@ -2,8 +2,30 @@
 
 import { useState } from "react";
 
+const categories = [
+  "Tshirt",
+  "Shirt",
+  "Pants",
+  "Skirt",
+  "Dress",
+  "Jacket",
+  "Shoes",
+  "Bag",
+  "Accessory",
+];
+
+const seasons = ["Spring", "Summer", "Autumn", "Winter", "All"];
+const styles = [
+  "Minimal",
+  "Casual",
+  "Smart Casual",
+  "Sport",
+  "Elegant",
+  "Streetwear",
+];
+
 interface AddClothingFormProps {
-  onAdded: () => void;
+  onAdded?: () => void;
 }
 
 export default function AddClothingForm({ onAdded }: AddClothingFormProps) {
@@ -12,102 +34,122 @@ export default function AddClothingForm({ onAdded }: AddClothingFormProps) {
     category: "Tshirt",
     color: "",
     season: "All",
+    style: "Casual",
     imageUrl: "",
   });
-
-  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     setFormData((prev) => ({
       ...prev,
-      [e.target.name]: e.target.value,
+      [event.target.name]: event.target.value,
     }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setMessage("");
-
-    try {
-      const response = await fetch("/api/clothes", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setMessage(data.message || "Bir hata oluştu.");
-        return;
-      }
-
-      setMessage("Kıyafet başarıyla eklendi.");
-      setFormData({
-        name: "",
-        category: "Tshirt",
-        color: "",
-        season: "All",
-        imageUrl: "",
-      });
-
-      onAdded();
-    } catch (error) {
-      setMessage("Sunucuya bağlanırken hata oluştu.");
-    } finally {
-      setLoading(false);
-    }
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    setMessage(
+      "Mock kayıt hazırlandı. Veritabanı bağlandığında bu parça dolabına eklenecek."
+    );
+    onAdded?.();
   };
 
   return (
     <form
       onSubmit={handleSubmit}
-      className="space-y-4 rounded-2xl border border-gray-300 bg-white p-6 shadow-md"
+      className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm"
     >
-      <h2 className="text-xl font-bold text-black">Yeni Kıyafet Ekle</h2>
+      <div className="grid gap-4 md:grid-cols-2">
+        <label className="space-y-2">
+          <span className="text-sm font-black text-zinc-700">Kıyafet adı</span>
+          <input
+            type="text"
+            name="name"
+            placeholder="Beyaz basic tişört"
+            value={formData.name}
+            onChange={handleChange}
+            className="w-full rounded-xl border border-zinc-300 bg-[#fbfaf7] px-4 py-3 text-sm font-semibold outline-none transition placeholder:text-zinc-400 focus:border-zinc-950"
+          />
+        </label>
 
-      <input
-        type="text"
-        name="name"
-        placeholder="Örn: Beyaz Basic Tişört"
-        value={formData.name}
-        onChange={handleChange}
-        className="w-full rounded border border-gray-300 p-2 text-black placeholder:text-gray-500"
-      />
+        <label className="space-y-2">
+          <span className="text-sm font-black text-zinc-700">Kategori</span>
+          <select
+            name="category"
+            value={formData.category}
+            onChange={handleChange}
+            className="w-full rounded-xl border border-zinc-300 bg-[#fbfaf7] px-4 py-3 text-sm font-semibold outline-none transition focus:border-zinc-950"
+          >
+            {categories.map((category) => (
+              <option key={category}>{category}</option>
+            ))}
+          </select>
+        </label>
 
-      <input
-        type="text"
-        name="color"
-        placeholder="Örn: Beyaz"
-        value={formData.color}
-        onChange={handleChange}
-        className="w-full rounded border border-gray-300 p-2 text-black placeholder:text-gray-500"
-      />
+        <label className="space-y-2">
+          <span className="text-sm font-black text-zinc-700">Renk</span>
+          <input
+            type="text"
+            name="color"
+            placeholder="Krem, siyah, lacivert"
+            value={formData.color}
+            onChange={handleChange}
+            className="w-full rounded-xl border border-zinc-300 bg-[#fbfaf7] px-4 py-3 text-sm font-semibold outline-none transition placeholder:text-zinc-400 focus:border-zinc-950"
+          />
+        </label>
 
-      <input
-        type="text"
-        name="imageUrl"
-        placeholder="Görsel URL gir"
-        value={formData.imageUrl}
-        onChange={handleChange}
-        className="w-full rounded border border-gray-300 p-2 text-black placeholder:text-gray-500"
-      />
+        <label className="space-y-2">
+          <span className="text-sm font-black text-zinc-700">Mevsim</span>
+          <select
+            name="season"
+            value={formData.season}
+            onChange={handleChange}
+            className="w-full rounded-xl border border-zinc-300 bg-[#fbfaf7] px-4 py-3 text-sm font-semibold outline-none transition focus:border-zinc-950"
+          >
+            {seasons.map((season) => (
+              <option key={season}>{season}</option>
+            ))}
+          </select>
+        </label>
 
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full rounded bg-black p-2 text-white"
-      >
-        {loading ? "Ekleniyor..." : "Ekle"}
-      </button>
+        <label className="space-y-2">
+          <span className="text-sm font-black text-zinc-700">Tarz</span>
+          <select
+            name="style"
+            value={formData.style}
+            onChange={handleChange}
+            className="w-full rounded-xl border border-zinc-300 bg-[#fbfaf7] px-4 py-3 text-sm font-semibold outline-none transition focus:border-zinc-950"
+          >
+            {styles.map((style) => (
+              <option key={style}>{style}</option>
+            ))}
+          </select>
+        </label>
 
-      {message && <p className="text-sm text-black">{message}</p>}
+        <label className="space-y-2">
+          <span className="text-sm font-black text-zinc-700">Görsel URL</span>
+          <input
+            type="url"
+            name="imageUrl"
+            placeholder="https://..."
+            value={formData.imageUrl}
+            onChange={handleChange}
+            className="w-full rounded-xl border border-zinc-300 bg-[#fbfaf7] px-4 py-3 text-sm font-semibold outline-none transition placeholder:text-zinc-400 focus:border-zinc-950"
+          />
+        </label>
+      </div>
+
+      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <button
+          type="submit"
+          className="rounded-full bg-zinc-950 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-zinc-900/15 transition hover:bg-zinc-800"
+        >
+          Mock Kıyafeti Hazırla
+        </button>
+        {message && <p className="text-sm font-semibold text-emerald-700">{message}</p>}
+      </div>
     </form>
   );
 }

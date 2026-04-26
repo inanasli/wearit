@@ -10,9 +10,9 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    const { name, category, color, season, imageUrl } = body;
+    const { name, category, color, season, style, imageUrl } = body;
 
-    if (!name || !category || !color || !season || !imageUrl) {
+    if (!name || !category || !color || !season || !style || !imageUrl) {
       return NextResponse.json(
         { message: "Tüm alanlar zorunludur." },
         { status: 400 }
@@ -25,6 +25,7 @@ export async function POST(request: Request) {
       category,
       color,
       season,
+      style,
       imageUrl,
       createdAt: new Date().toISOString(),
     };
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
     clothes.unshift(newItem);
 
     return NextResponse.json(newItem, { status: 201 });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { message: "Kıyafet eklenirken hata oluştu." },
       { status: 500 }
