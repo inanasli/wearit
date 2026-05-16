@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { classifyClothingWithLocalVision } from "@/lib/ai/localVisionClassifier";
 import { FORMALITIES, MAIN_CATEGORIES, type ClothingClassification, type ClothingItem, type SourceType } from "@/lib/types";
 
 type Mode = "upload" | "image_url" | "product_url";
@@ -46,6 +47,7 @@ export function AddClothingForm() {
 
     try {
       let classification: ClothingClassification;
+      let hasRealVision = false;
       let nextSource: PendingSource;
 
       if (mode === "upload") {
@@ -57,6 +59,12 @@ export function AddClothingForm() {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Görsel analiz edilemedi.");
         classification = data.classification;
+        hasRealVision = Boolean(data.hasRealVision);
+        if (!hasRealVision) {
+          setLoadingText("Yerel görsel modeli deneniyor...");
+          classification = await classifyClothingWithLocalVision({ image: file, fileName: file.name });
+          hasRealVision = !/demo|failed|mock/i.test(classification.aiDescription);
+        }
         nextSource = { sourceType: "upload", imageUrl: previewUrl, sourceUrl: null, file, previewUrl, hasVisualImage: true };
       } else if (mode === "image_url") {
         if (!imageUrl || !/^https?:\/\//i.test(imageUrl)) throw new Error("Geçerli bir görsel URL'si gir.");
@@ -68,6 +76,12 @@ export function AddClothingForm() {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Görsel analiz edilemedi.");
         classification = data.classification;
+        hasRealVision = Boolean(data.hasRealVision);
+        if (!hasRealVision) {
+          setLoadingText("Yerel görsel modeli deneniyor...");
+          classification = await classifyClothingWithLocalVision({ image: imageUrl, imageUrl });
+          hasRealVision = !/demo|failed|mock/i.test(classification.aiDescription);
+        }
         nextSource = { sourceType: "image_url", imageUrl, sourceUrl: imageUrl, hasVisualImage: true };
       } else {
         if (!productUrl || !/^https?:\/\//i.test(productUrl)) throw new Error("Geçerli bir ürün URL'si gir.");
@@ -79,6 +93,12 @@ export function AddClothingForm() {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Ürün görseli analiz edilemedi.");
         classification = data.classification;
+        hasRealVision = Boolean(data.hasRealVision);
+        if (!hasRealVision && data.imageUrl) {
+          setLoadingText("Yerel görsel modeli deneniyor...");
+          classification = await classifyClothingWithLocalVision({ image: data.imageUrl, imageUrl: data.imageUrl, productUrl });
+          hasRealVision = !/demo|failed|mock/i.test(classification.aiDescription);
+        }
         nextSource = { sourceType: "product_url", imageUrl: data.imageUrl || "/placeholder-clothing.svg", sourceUrl: productUrl, hasVisualImage: Boolean(data.imageUrl) };
       }
 
@@ -86,13 +106,11 @@ export function AddClothingForm() {
       setOriginalPrediction(JSON.parse(JSON.stringify(classification)));
       setPendingSource(nextSource);
       setWarning(
-        classification.aiDescription.includes("OPENAI_API_KEY")
-          ? "Şu an gerçek fotoğraf tanıma kapalı. OPENAI_API_KEY eklenirse sistem yüklenen görselden tişört/pantolon/ayakkabı ve renkleri otomatik çıkarır."
-          : classification.aiDescription.toLowerCase().includes("demo")
-            ? "Gerçek görsel analizi yapılamadı; geçici demo tahmini gösteriliyor."
+        !hasRealVision
+          ? "Bu tahmin güvenilir görsel modelden gelmedi. Gerçek otomatik tanıma için OPENAI_API_KEY eklenmeli veya yerel modelin indirilmesine izin verilmeli."
             : "",
       );
-      setMessage("Kaydetmeden önce tahmini kontrol et.");
+      setMessage("Sistem kıyafeti otomatik analiz etti. Alanlar sadece kontrol/düzeltme için gösteriliyor.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Görsel sınıflandırılamadı.");
     } finally {
@@ -148,10 +166,10 @@ export function AddClothingForm() {
       <div className="page-hero">
         <div>
           <span className="eyebrow">Dolabını oluştur</span>
-          <h1 className="hero-title">Kıyafet fotoğrafını ekle, sistem türünü ve etiketlerini tahmin etsin.</h1>
+          <h1 className="hero-title">Kıyafet fotoğrafını ekle, sistem türünü ve rengini otomatik çıkarsın.</h1>
           <p className="hero-copy">
-            Fotoğraf yükleyebilir, görsel linki verebilir veya ürün linkinden tahmin alabilirsin.
-            Kaydetmeden önce kategori, renk, stil ve mevsim etiketlerini düzeltebilirsin.
+            Sen kombin ya da kategori girmek zorunda değilsin. Görsel analiz sonucu otomatik dolar;
+            alanlar yalnızca yanlış tahmin olursa kontrol etmek için açık bırakılır.
           </p>
         </div>
       </div>
@@ -184,7 +202,7 @@ export function AddClothingForm() {
             <input value={productUrl} onChange={(event) => setProductUrl(event.target.value)} placeholder="https://shop.example.com/product" />
           </label>
         )}
-        <button onClick={classifyForReview} disabled={Boolean(loadingText)}>{loadingText || "Analiz et"}</button>
+        <button onClick={classifyForReview} disabled={Boolean(loadingText)}>{loadingText || "Otomatik tanı"}</button>
       </div>
       </div>
 
@@ -198,7 +216,7 @@ export function AddClothingForm() {
           ) : (
             <div className="item-image placeholder-image">No product image extracted</div>
           )}
-          <h2>Tahmini kontrol et</h2>
+          <h2>Otomatik tanıma sonucu</h2>
           {draft.confidence < 0.6 && <p className="review-note">Tahmin düşük güvenli, lütfen düzelt.</p>}
           <div className="grid two">
             <label>İsim<input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label>

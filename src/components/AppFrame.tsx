@@ -19,7 +19,6 @@ export default function AppFrame({ children }: Readonly<{ children: React.ReactN
         <nav>
           <Link href="/add-clothing">Kıyafet Ekle</Link>
           <Link href="/wardrobe">Dijital Dolap</Link>
-          <Link href="/outfits">Kombinlerim</Link>
           <Link href="/recommend">Öneri Al</Link>
         </nav>
       </header>

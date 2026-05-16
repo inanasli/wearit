@@ -16,7 +16,7 @@ export async function POST(request: Request) {
       const classification = await classifyClothingImage({ base64Image, fileName: file.name });
       return Response.json({
         classification,
-        hasRealVision: !classification.aiDescription.toLowerCase().includes("mock"),
+        hasRealVision: isRealVisionResult(classification.aiDescription),
       });
     }
 
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
       return Response.json({
         classification,
         imageUrl: body.imageUrl,
-        hasRealVision: !classification.aiDescription.toLowerCase().includes("mock"),
+        hasRealVision: isRealVisionResult(classification.aiDescription),
       });
     }
 
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
         },
         imageUrl: metadata.imageUrl,
         productUrl: body.productUrl,
-        hasRealVision: !classification.aiDescription.toLowerCase().includes("mock"),
+        hasRealVision: isRealVisionResult(classification.aiDescription),
       });
     }
 
@@ -59,4 +59,8 @@ export async function POST(request: Request) {
   } catch {
     return jsonError("Görsel analiz edilemedi.", 500);
   }
+}
+
+function isRealVisionResult(description: string) {
+  return !/openai_api_key|demo|geçici|mock/i.test(description);
 }

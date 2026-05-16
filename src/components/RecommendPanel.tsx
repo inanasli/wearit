@@ -165,7 +165,7 @@ export function RecommendPanel() {
       <div className="page-hero">
         <div>
           <span className="eyebrow">Akıllı kombin önerisi</span>
-          <h1 className="hero-title">Dolabındaki parçalardan bugünün havasına ve stiline uygun kombin seçilir.</h1>
+          <h1 className="hero-title">Sen kombin yapmazsın; sistem dolabından bugüne uygun kombini seçer.</h1>
           <p className="hero-copy">
             Algoritma kategori tamamlığı, renk uyumu, stil tercihleri, daha önce kaydettiğin kombinler,
             geri bildirimler ve hava durumunu birlikte skorlar.
@@ -232,8 +232,8 @@ export function RecommendPanel() {
           )}
           {hasMinimumWardrobe && (
             <>
-              <p>Hazır olduğunda sistem tüm olası kombinleri skorlayıp en yüksek puanlı seçeneği kaydeder.</p>
-              <button onClick={generate} disabled={loading}>{loading ? "Hesaplanıyor..." : "Bugün ne giysem?"}</button>
+              <p>Sistem dolabındaki olası kombinleri kendisi üretir, skorlar ve en uygun olanı seçer.</p>
+              <button onClick={generate} disabled={loading}>{loading ? "Hesaplanıyor..." : "Kombini otomatik seç"}</button>
             </>
           )}
         </div>
