@@ -176,10 +176,38 @@ button:disabled {
 
 .item-image {
   width: 100%;
-  aspect-ratio: 4 / 5;
-  object-fit: cover;
+  height: 14rem;
+  max-height: 14rem;
+  object-fit: contain;
   border-radius: 6px;
-  background: #eee3d8;
+  background: #f1eee8;
+  display: block;
+}
+
+.placeholder-image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  text-align: center;
+  padding: 16px;
+}
+
+.source-link {
+  display: inline-flex;
+  max-width: 100%;
+  color: var(--accent-dark);
+  font-size: 13px;
+  margin-top: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.review-note {
+  color: #8a4b26;
+  font-size: 13px;
+  margin: 8px 0 0;
 }
 
 .tags {
@@ -194,6 +222,33 @@ button:disabled {
   padding: 4px 8px;
   font-size: 12px;
   color: #4d443c;
+}
+
+.chip-section {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  background: #efe7dc;
+  color: #4d443c;
+  border: 1px solid var(--line);
+  padding: 7px 10px;
+}
+
+.chip.selected {
+  background: var(--accent-dark);
+  border-color: var(--accent-dark);
+  color: #fff;
 }
 
 .message {

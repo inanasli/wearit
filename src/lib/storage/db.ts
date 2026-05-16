@@ -11,6 +11,8 @@ const emptyDb = (): Database => ({
   recommendations: [],
   feedback: [],
   preferences: [],
+  colorPreferences: [],
+  classificationCorrections: [],
 });
 
 export function createId(prefix: string) {

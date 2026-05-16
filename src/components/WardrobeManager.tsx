@@ -71,7 +71,13 @@ export function WardrobeManager() {
                   <img className="item-image" src={item.imageUrl} alt={item.name} />
                   <h3>{item.name}</h3>
                   <p>{item.mainCategory} / {item.subCategory} - {Math.round(item.confidence * 100)}%</p>
+                  {item.confidence < 0.6 && <p className="review-note">Please review classification</p>}
                   <div className="tags">{[...item.colors, ...item.styleTags].map((tag) => <span className="tag" key={tag}>{tag}</span>)}</div>
+                  {item.sourceUrl && (
+                    <a className="source-link" href={item.sourceUrl} target="_blank" rel="noreferrer" title={item.sourceUrl}>
+                      {item.sourceType === "product_url" ? "View product" : `View source${sourceDomain(item.sourceUrl) ? `: ${sourceDomain(item.sourceUrl)}` : ""}`}
+                    </a>
+                  )}
                   <div className="actions" style={{ marginTop: 12 }}>
                     <button className="secondary" onClick={() => setEditing(item)}>Edit</button>
                     <button className="danger" onClick={() => remove(item.id)}>Delete</button>
@@ -107,4 +113,12 @@ export function WardrobeManager() {
 
 function csv(value: string) {
   return value.split(",").map((item) => item.trim().toLowerCase()).filter(Boolean);
+}
+
+function sourceDomain(value: string) {
+  try {
+    return new URL(value).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
 }

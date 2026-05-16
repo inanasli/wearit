@@ -14,10 +14,11 @@ export async function POST() {
       outfitId: generated.outfit.id,
       reason: generated.reason,
       score: generated.score,
+      scoreBreakdown: generated.scoreBreakdown,
       createdAt: new Date().toISOString(),
     };
     db.recommendations.push(recommendation);
-    return { recommendation, outfit: generated.outfit, outfitItems: generated.outfitItems };
+    return { recommendation, outfit: generated.outfit, outfitItems: generated.outfitItems, topCandidates: generated.topCandidates };
   });
 
   if (!result) {

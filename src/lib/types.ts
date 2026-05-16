@@ -14,11 +14,14 @@ export const STYLE_OPTIONS = [
   "casual",
   "sporty",
   "formal",
+  "smart_casual",
   "streetwear",
   "minimal",
   "classic",
+  "bohemian",
   "colorful",
   "elegant",
+  "summer",
   "comfortable",
   "basic",
   "trendy",
@@ -48,6 +51,7 @@ export type ClothingItem = ClothingClassification & {
   imageUrl: string;
   sourceType: SourceType;
   sourceUrl?: string | null;
+  originalClassification?: ClothingClassification | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -76,6 +80,7 @@ export type Recommendation = {
   outfitId: string;
   reason: string;
   score: number;
+  scoreBreakdown?: Record<string, number>;
   createdAt: string;
 };
 
@@ -97,6 +102,26 @@ export type UserStylePreference = {
   updatedAt: string;
 };
 
+export type UserColorPreference = {
+  id: string;
+  userId?: string | null;
+  color: string;
+  weight: number;
+  updatedAt: string;
+};
+
+export type ClassificationCorrectionLog = {
+  id: string;
+  userId?: string | null;
+  clothingItemId: string;
+  sourceType: SourceType;
+  sourceUrl?: string | null;
+  originalClassification: ClothingClassification;
+  confirmedClassification: ClothingClassification;
+  changedFields: string[];
+  createdAt: string;
+};
+
 export type Database = {
   clothingItems: ClothingItem[];
   outfits: Outfit[];
@@ -104,4 +129,6 @@ export type Database = {
   recommendations: Recommendation[];
   feedback: Feedback[];
   preferences: UserStylePreference[];
+  colorPreferences: UserColorPreference[];
+  classificationCorrections: ClassificationCorrectionLog[];
 };

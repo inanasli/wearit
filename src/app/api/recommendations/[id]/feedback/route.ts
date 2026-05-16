@@ -35,7 +35,27 @@ export async function POST(request: Request, { params }: Params) {
           db.preferences.push({ id: createId("pref"), userId: "demo-user", styleTag: tag, weight: deltas[feedbackType], updatedAt: new Date().toISOString() });
         }
       }
-      return { feedback, preferences: db.preferences };
+      const outfitItemIds = db.outfitItems.filter((item) => item.outfitId === outfit.id).map((item) => item.clothingItemId);
+      const colors = [
+        ...new Set(
+          db.clothingItems
+            .filter((item) => outfitItemIds.includes(item.id))
+            .flatMap((item) => item.colors)
+            .filter((color) => color && color !== "unknown")
+            .map((color) => color.toLowerCase() === "grey" ? "gray" : color.toLowerCase()),
+        ),
+      ];
+      db.colorPreferences ||= [];
+      for (const color of colors) {
+        const existing = db.colorPreferences.find((pref) => pref.color === color);
+        if (existing) {
+          existing.weight = Number((existing.weight + deltas[feedbackType]).toFixed(2));
+          existing.updatedAt = new Date().toISOString();
+        } else {
+          db.colorPreferences.push({ id: createId("color_pref"), userId: "demo-user", color, weight: deltas[feedbackType], updatedAt: new Date().toISOString() });
+        }
+      }
+      return { feedback, preferences: db.preferences, colorPreferences: db.colorPreferences };
     });
     return saved ? Response.json(saved, { status: 201 }) : jsonError("Feedback could not be saved", 404);
   } catch {

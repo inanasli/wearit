@@ -4,9 +4,16 @@ import { useEffect, useState } from "react";
 import { STYLE_OPTIONS, type ClothingItem, type UserStylePreference } from "@/lib/types";
 
 type RecommendationResult = {
-  recommendation: { id: string; reason: string; score: number };
+  recommendation: { id: string; reason: string; score: number; scoreBreakdown?: Record<string, number> };
   outfit: { id: string; name: string; styleTags: string[] };
   outfitItems: Array<{ clothingItemId: string }>;
+  topCandidates?: Array<{
+    outfitItemIds: string[];
+    itemNames: string[];
+    score: number;
+    scoreBreakdown: Record<string, number>;
+    reason: string;
+  }>;
 };
 
 export function RecommendPanel() {
@@ -102,6 +109,13 @@ export function RecommendPanel() {
             <h3>{result.outfit.name}</h3>
             <p>Score: {result.recommendation.score}</p>
             <p>{result.recommendation.reason}</p>
+            {result.recommendation.scoreBreakdown && (
+              <div className="tags">
+                {Object.entries(result.recommendation.scoreBreakdown).map(([label, value]) => (
+                  <span className="tag" key={label}>{label}: {value}</span>
+                ))}
+              </div>
+            )}
             <div className="grid three">
               {recommendedItems?.map((item) => <img className="item-image" src={item.imageUrl} alt={item.name} key={item.id} />)}
             </div>
@@ -111,6 +125,18 @@ export function RecommendPanel() {
               <button className="danger" onClick={() => feedback("dislike")}>Beğenmedim</button>
             </div>
           </article>
+        )}
+        {result?.topCandidates && result.topCandidates.length > 1 && (
+          <div className="grid" style={{ marginTop: 16 }}>
+            <h3>Top candidates</h3>
+            {result.topCandidates.map((candidate, index) => (
+              <article className="card" key={candidate.outfitItemIds.join("-")}>
+                <strong>#{index + 1} - Score {candidate.score}</strong>
+                <p>{candidate.itemNames.join(" + ")}</p>
+                <p>{candidate.reason}</p>
+              </article>
+            ))}
+          </div>
         )}
       </div>
     </section>
