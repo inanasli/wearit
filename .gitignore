@@ -1,0 +1,11 @@
+node_modules
+.next
+out
+dist
+.env*
+!.env.example
+data/*.json
+public/uploads/*
+!public/uploads/.gitkeep
+npm-debug.log*
+*.tsbuildinfo
