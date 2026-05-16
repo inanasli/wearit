@@ -1,20 +1,27 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "WearIt | AI Kombin Asistanı",
-  description:
-    "Kıyafetlerini dijital dolaba ekle, hava durumu ve kişisel tercihlere göre kombin önerileri al.",
+  title: "Wear It MVP",
+  description: "Wardrobe and outfit recommendation MVP",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="tr" className="h-full antialiased">
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="en">
+      <body>
+        <header className="topbar">
+          <Link className="brand" href="/">Wear It</Link>
+          <nav>
+            <Link href="/add-clothing">Add Clothing</Link>
+            <Link href="/wardrobe">Wardrobe</Link>
+            <Link href="/outfits">Outfits</Link>
+            <Link href="/recommend">Recommend</Link>
+          </nav>
+        </header>
+        <main>{children}</main>
+      </body>
     </html>
   );
 }
