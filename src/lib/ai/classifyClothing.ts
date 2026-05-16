@@ -1,6 +1,7 @@
 import "server-only";
 import { normalizeClassification } from "@/lib/api";
 import { mockClassifyClothing } from "@/lib/ai/mockClothingClassifier";
+import { classifyClothingWithServerVision } from "@/lib/ai/serverVisionClassifier";
 import type { ClothingClassification } from "@/lib/types";
 
 type ClassifyInput = {
@@ -17,14 +18,22 @@ export async function classifyClothingImage(input: ClassifyInput): Promise<Cloth
     try {
       return await classifyWithOpenAI(input);
     } catch {
-      return mockClassifyClothing(input, "Gerçek görsel sınıflandırma başarısız oldu; geçici demo tahmini kullanıldı.");
+      return await classifyWithFallback(input, "OpenAI görsel sınıflandırma başarısız oldu.");
     }
   }
 
-  return mockClassifyClothing(
-    input,
-    "Gerçek fotoğraf analizi için OPENAI_API_KEY gerekli. Şu an yalnızca dosya adı/link metninden demo tahmini yapıldı.",
-  );
+  return await classifyWithFallback(input, "OPENAI_API_KEY yok; server-side CLIP modeli denendi.");
+}
+
+async function classifyWithFallback(input: ClassifyInput, failureReason: string) {
+  try {
+    return await classifyClothingWithServerVision(input);
+  } catch {
+    return mockClassifyClothing(
+      input,
+      `${failureReason} Gerçek fotoğraf analizi çalışmadı; yalnızca dosya adı/link metninden demo tahmini yapıldı.`,
+    );
+  }
 }
 
 async function classifyWithOpenAI(input: ClassifyInput): Promise<ClothingClassification> {
