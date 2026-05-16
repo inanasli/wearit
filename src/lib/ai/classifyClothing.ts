@@ -13,18 +13,18 @@ type ClassifyInput = {
 };
 
 export async function classifyClothingImage(input: ClassifyInput): Promise<ClothingClassification> {
-  // Real AI mode is used only when OPENAI_API_KEY exists on the server.
-  // Without it, the MVP stays free and reliable through mock/demo classification.
   if (process.env.OPENAI_API_KEY) {
     try {
       return await classifyWithOpenAI(input);
     } catch {
-      return mockClassifyClothing(input, "AI classification failed, so demo-safe mock data was used.");
+      return mockClassifyClothing(input, "Gerçek görsel sınıflandırma başarısız oldu; geçici demo tahmini kullanıldı.");
     }
   }
 
-  // Mock mode lets the rest of the app work unchanged; real AI can be enabled later.
-  return mockClassifyClothing(input, "Mock classification used because no API key was found.");
+  return mockClassifyClothing(
+    input,
+    "Gerçek fotoğraf analizi için OPENAI_API_KEY gerekli. Şu an yalnızca dosya adı/link metninden demo tahmini yapıldı.",
+  );
 }
 
 async function classifyWithOpenAI(input: ClassifyInput): Promise<ClothingClassification> {
@@ -51,7 +51,7 @@ async function classifyWithOpenAI(input: ClassifyInput): Promise<ClothingClassif
             {
               type: "input_text",
               text:
-                "Classify the dominant clothing item. Return only JSON with fields: name, mainCategory, subCategory, colors, styleTags, seasonTags, formality, aiDescription, confidence. Do not invent brands. Use normalized English tags.",
+                "Classify the dominant clothing item in the image. Return only valid JSON with fields: name, mainCategory, subCategory, colors, styleTags, seasonTags, formality, aiDescription, confidence. mainCategory must be one of head, upper, lower, dress, outerwear, shoes, bag, accessory. Identify whether it is a t-shirt, shirt, sweater, pants, jeans, skirt, dress, jacket, coat, sneakers, boots, bag, etc. Extract visible dominant colors. Use normalized English tags. Do not invent brands.",
             },
             imageContent,
           ],

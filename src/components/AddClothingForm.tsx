@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { classifyClothingWithLocalVision } from "@/lib/ai/localVisionClassifier";
-import { mockClassifyClothing } from "@/lib/ai/mockClothingClassifier";
 import { FORMALITIES, MAIN_CATEGORIES, type ClothingClassification, type ClothingItem, type SourceType } from "@/lib/types";
 
 type Mode = "upload" | "image_url" | "product_url";
@@ -53,52 +51,45 @@ export function AddClothingForm() {
       if (mode === "upload") {
         if (!file) throw new Error("Lütfen bir kıyafet görseli yükle.");
         const previewUrl = URL.createObjectURL(file);
-        classification = await classifyClothingWithLocalVision({ image: file, fileName: file.name });
+        const form = new FormData();
+        form.append("image", file);
+        const response = await fetch("/api/clothing/analyze", { method: "POST", body: form });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Görsel analiz edilemedi.");
+        classification = data.classification;
         nextSource = { sourceType: "upload", imageUrl: previewUrl, sourceUrl: null, file, previewUrl, hasVisualImage: true };
       } else if (mode === "image_url") {
         if (!imageUrl || !/^https?:\/\//i.test(imageUrl)) throw new Error("Geçerli bir görsel URL'si gir.");
-        classification = await classifyClothingWithLocalVision({ image: imageUrl, imageUrl });
+        const response = await fetch("/api/clothing/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageUrl }),
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Görsel analiz edilemedi.");
+        classification = data.classification;
         nextSource = { sourceType: "image_url", imageUrl, sourceUrl: imageUrl, hasVisualImage: true };
       } else {
         if (!productUrl || !/^https?:\/\//i.test(productUrl)) throw new Error("Geçerli bir ürün URL'si gir.");
-        const metadataResponse = await fetch("/api/product-metadata", {
+        const response = await fetch("/api/clothing/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ productUrl }),
         });
-        const metadata = await metadataResponse.json();
-        if (!metadataResponse.ok) {
-          throw new Error(metadata.error || "Ürün görseli alınamadı. Doğrudan görsel URL'si kullanabilirsin.");
-        }
-        if (metadata.imageUrl) {
-          classification = await classifyClothingWithLocalVision({
-            image: metadata.imageUrl,
-            imageUrl: metadata.imageUrl,
-            productUrl,
-            title: metadata.title,
-            description: metadata.description || metadata.fallbackText,
-          });
-          nextSource = { sourceType: "product_url", imageUrl: metadata.imageUrl, sourceUrl: productUrl, hasVisualImage: true };
-        } else if (metadata.title || metadata.description || metadata.fallbackText) {
-          classification = mockClassifyClothing({
-            productUrl,
-            title: metadata.title,
-            description: [metadata.description, metadata.fallbackText].filter(Boolean).join(" "),
-          }, "Product image could not be extracted. Classification was estimated from product text. You can upload an image or paste a direct image URL for better visual analysis.");
-          nextSource = { sourceType: "product_url", imageUrl: "/placeholder-clothing.svg", sourceUrl: productUrl, hasVisualImage: false };
-        } else {
-          throw new Error("Ürün görseli alınamadı. Doğrudan görsel URL'si kullanabilirsin.");
-        }
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Ürün görseli analiz edilemedi.");
+        classification = data.classification;
+        nextSource = { sourceType: "product_url", imageUrl: data.imageUrl || "/placeholder-clothing.svg", sourceUrl: productUrl, hasVisualImage: Boolean(data.imageUrl) };
       }
 
       setDraft(classification);
       setOriginalPrediction(JSON.parse(JSON.stringify(classification)));
       setPendingSource(nextSource);
       setWarning(
-        classification.aiDescription.includes("Product image could not be extracted")
-          ? "Ürün görseli alınamadı; tahmin ürün metninden yapıldı."
-          : classification.aiDescription.includes("Local vision classifier failed")
-            ? "Yerel görsel sınıflandırıcı çalışmadı; demo sınıflandırıcı kullanıldı."
+        classification.aiDescription.includes("OPENAI_API_KEY")
+          ? "Şu an gerçek fotoğraf tanıma kapalı. OPENAI_API_KEY eklenirse sistem yüklenen görselden tişört/pantolon/ayakkabı ve renkleri otomatik çıkarır."
+          : classification.aiDescription.toLowerCase().includes("demo")
+            ? "Gerçek görsel analizi yapılamadı; geçici demo tahmini gösteriliyor."
             : "",
       );
       setMessage("Kaydetmeden önce tahmini kontrol et.");
