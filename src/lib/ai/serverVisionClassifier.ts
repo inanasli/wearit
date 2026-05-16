@@ -1,4 +1,7 @@
 import "server-only";
+import { promises as fs } from "fs";
+import os from "os";
+import path from "path";
 import { normalizeClassification } from "@/lib/api";
 import type { ClothingClassification, Formality, MainCategory } from "@/lib/types";
 
@@ -119,38 +122,57 @@ const styleMap: Record<string, string> = {
 let classifierPromise: Promise<ZeroShotClassifier> | null = null;
 
 export async function classifyClothingWithServerVision(input: ClassifyInput): Promise<ClothingClassification> {
-  const image = input.base64Image || input.imageUrl;
-  if (!image) throw new Error("No image provided for server vision classification.");
+  const prepared = await prepareImageInput(input);
 
-  const classifier = await getClassifier();
-  const [clothing, colors, styles] = await Promise.all([
-    classifier(image, clothingLabels, { hypothesis_template: "This is a photo of a {}." }),
-    classifier(image, colorLabels, { hypothesis_template: "This clothing item is {}." }),
-    classifier(image, styleLabels, { hypothesis_template: "This is a photo of {}." }),
-  ]);
+  try {
+    const classifier = await getClassifier();
+    const [clothing, colors, styles] = await Promise.all([
+      classifier(prepared.image, clothingLabels, { hypothesis_template: "This is a photo of a {}." }),
+      classifier(prepared.image, colorLabels, { hypothesis_template: "This clothing item is {}." }),
+      classifier(prepared.image, styleLabels, { hypothesis_template: "This is a photo of {}." }),
+    ]);
 
-  const topClothing = clothing[0];
-  if (!topClothing || topClothing.score < 0.18) {
-    throw new Error("Server vision model could not classify the clothing item confidently.");
+    const topClothing = clothing[0];
+    if (!topClothing || topClothing.score < 0.18) {
+      throw new Error("Server vision model could not classify the clothing item confidently.");
+    }
+
+    const subCategory = topClothing.label;
+    const mainCategory = categoryMap[subCategory] || "accessory";
+    const selectedColors = selectColors(colors);
+    const styleTags = selectStyles(styles, subCategory);
+    const formality = detectFormality(subCategory, styleTags);
+
+    return normalizeClassification({
+      name: titleCase(`${selectedColors[0] || ""} ${subCategory}`.trim()),
+      mainCategory,
+      subCategory,
+      colors: selectedColors.length ? selectedColors : ["unknown"],
+      styleTags,
+      seasonTags: detectSeasonTags(subCategory),
+      formality,
+      aiDescription: "Server-side CLIP vision classification completed from the uploaded image.",
+      confidence: Number(Math.min(0.94, Math.max(0.35, topClothing.score + 0.18)).toFixed(2)),
+    });
+  } finally {
+    if (prepared.cleanupPath) {
+      await fs.unlink(prepared.cleanupPath).catch(() => undefined);
+    }
   }
+}
 
-  const subCategory = topClothing.label;
-  const mainCategory = categoryMap[subCategory] || "accessory";
-  const selectedColors = selectColors(colors);
-  const styleTags = selectStyles(styles, subCategory);
-  const formality = detectFormality(subCategory, styleTags);
+async function prepareImageInput(input: ClassifyInput) {
+  if (input.imageUrl) return { image: input.imageUrl, cleanupPath: null as string | null };
+  if (!input.base64Image) throw new Error("No image provided for server vision classification.");
 
-  return normalizeClassification({
-    name: titleCase(`${selectedColors[0] || ""} ${subCategory}`.trim()),
-    mainCategory,
-    subCategory,
-    colors: selectedColors.length ? selectedColors : ["unknown"],
-    styleTags,
-    seasonTags: detectSeasonTags(subCategory),
-    formality,
-    aiDescription: "Server-side CLIP vision classification completed from the uploaded image.",
-    confidence: Number(Math.min(0.94, Math.max(0.35, topClothing.score + 0.18)).toFixed(2)),
-  });
+  const match = input.base64Image.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (!match) throw new Error("Invalid base64 image for server vision classification.");
+
+  const mimeType = match[1];
+  const extension = mimeType.includes("png") ? ".png" : mimeType.includes("webp") ? ".webp" : ".jpg";
+  const filePath = path.join(os.tmpdir(), `wearit-classify-${Date.now()}-${Math.random().toString(36).slice(2)}${extension}`);
+  await fs.writeFile(filePath, Buffer.from(match[2], "base64"));
+  return { image: filePath, cleanupPath: filePath };
 }
 
 async function getClassifier(): Promise<ZeroShotClassifier> {
@@ -160,7 +182,7 @@ async function getClassifier(): Promise<ZeroShotClassifier> {
       env.allowLocalModels = false;
       env.allowRemoteModels = true;
       return (await pipeline("zero-shot-image-classification", MODEL_ID, {
-        device: "wasm",
+        device: "cpu",
         dtype: "q8",
       })) as unknown as ZeroShotClassifier;
     })();

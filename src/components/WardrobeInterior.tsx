@@ -10,46 +10,42 @@ interface WardrobeInteriorProps {
 const shelves = [
   {
     title: "Kazaklar",
-    imageSrc: "/wardrobe/categories/sweater.png",
+    imageSrc: "/wardrobe/categories/sweater/sweater.png",
     className: "left-[12%] right-[12%] top-[18%] h-[14%]",
   },
   {
     title: "Tişörtler",
-    imageSrc: "/wardrobe/categories/tshirt.png",
+    imageSrc: "/wardrobe/categories/tshirt/tshirt.png",
     className: "left-[10%] top-[37%] h-[22%] w-[29%]",
   },
   {
-    title: "Ceketler / Elbiseler",
-    imageSrc: "/wardrobe/categories/jacket.png",
+    title: "Ceketler",
+    imageSrc: "/wardrobe/categories/jacket/jacket.png",
     className: "left-[42%] top-[37%] h-[22%] w-[48%]",
   },
   {
-    title: "Aksesuarlar / Takılar",
-    imageSrc: "/wardrobe/categories/jewelry.png",
+    title: "Aksesuarlar",
+    imageSrc: "/placeholder-clothing.svg",
     className: "left-[10%] top-[64%] h-[13%] w-[80%]",
   },
   {
     title: "Pantolonlar",
-    imageSrc: "/wardrobe/categories/pants.png",
+    imageSrc: "/placeholder-clothing.svg",
     className: "left-[10%] bottom-[12%] h-[16%] w-[34%]",
   },
   {
     title: "Ayakkabılar",
-    imageSrc: "/wardrobe/categories/shoes.png",
+    imageSrc: "/placeholder-clothing.svg",
     className: "left-[47%] bottom-[12%] h-[16%] w-[22%]",
   },
   {
     title: "Çanta",
-    imageSrc: "/wardrobe/categories/bag.png",
+    imageSrc: "/placeholder-clothing.svg",
     className: "right-[10%] bottom-[12%] h-[16%] w-[18%]",
   },
 ];
 
 export default function WardrobeInterior({ isOpen }: WardrobeInteriorProps) {
-  const handleShelfClick = (title: string) => {
-    console.log(title);
-  };
-
   return (
     <motion.div
       className="absolute inset-[34px] overflow-hidden rounded-t-[8.6rem] rounded-b-[1.2rem] border border-amber-100/12 bg-[linear-gradient(180deg,#170d09_0%,#2b170e_52%,#120806_100%)] shadow-inner shadow-black/80 sm:inset-[42px] sm:rounded-t-[10.2rem]"
@@ -81,7 +77,7 @@ export default function WardrobeInterior({ isOpen }: WardrobeInteriorProps) {
             title={shelf.title}
             imageSrc={shelf.imageSrc}
             className={shelf.className}
-            onClick={() => handleShelfClick(shelf.title)}
+            onClick={() => undefined}
           />
         </motion.div>
       ))}

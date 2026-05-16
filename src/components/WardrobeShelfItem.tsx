@@ -31,7 +31,6 @@ export default function WardrobeShelfItem({
       <span className="absolute inset-x-5 bottom-6 h-px bg-gradient-to-r from-transparent via-black/55 to-transparent" />
       <span className="absolute inset-0 opacity-[0.13] [background-image:repeating-linear-gradient(90deg,rgba(255,255,255,.16)_0_1px,transparent_1px_18px)]" />
       <span className="absolute inset-0 rounded-md opacity-0 shadow-[inset_0_0_46px_rgba(245,205,135,0.16),0_0_30px_rgba(245,205,135,0.18)] transition group-hover:opacity-100" />
-
       <span className="absolute left-1/2 top-1/2 h-16 w-28 -translate-x-1/2 -translate-y-1/2 rounded-full bg-amber-100/0 blur-2xl transition group-hover:bg-amber-100/12" />
 
       <span className="absolute inset-x-4 bottom-8 top-5 overflow-hidden rounded-md">
@@ -46,7 +45,7 @@ export default function WardrobeShelfItem({
           />
         ) : (
           <span className="flex h-full w-full items-center justify-center rounded-md border border-amber-100/10 bg-[radial-gradient(circle_at_50%_20%,rgba(245,205,135,0.12),transparent_42%),linear-gradient(180deg,rgba(255,255,255,0.035),rgba(0,0,0,0.16))] text-[0.5rem] font-black uppercase tracking-[0.18em] text-amber-100/42">
-            Görsel eklenecek
+            Görsel yok
           </span>
         )}
       </span>
