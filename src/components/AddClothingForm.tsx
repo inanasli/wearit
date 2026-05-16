@@ -20,7 +20,7 @@ const styleOptions = ["casual", "smart_casual", "formal", "sporty", "streetwear"
 const seasonOptions = ["spring", "summer", "autumn", "winter", "all_season"];
 
 export function AddClothingForm() {
-  const [mode, setMode] = useState<Mode>("image_url");
+  const [mode, setMode] = useState<Mode>("upload");
   const [imageUrl, setImageUrl] = useState("");
   const [productUrl, setProductUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -39,7 +39,7 @@ export function AddClothingForm() {
   }, [pendingSource?.previewUrl]);
 
   async function classifyForReview() {
-    setLoadingText("Analyzing image locally...");
+    setLoadingText("Görsel analiz ediliyor...");
     setMessage("");
     setWarning("");
     setCreated(null);
@@ -51,16 +51,16 @@ export function AddClothingForm() {
       let nextSource: PendingSource;
 
       if (mode === "upload") {
-        if (!file) throw new Error("Please upload an image file.");
+        if (!file) throw new Error("Lütfen bir kıyafet görseli yükle.");
         const previewUrl = URL.createObjectURL(file);
         classification = await classifyClothingWithLocalVision({ image: file, fileName: file.name });
         nextSource = { sourceType: "upload", imageUrl: previewUrl, sourceUrl: null, file, previewUrl, hasVisualImage: true };
       } else if (mode === "image_url") {
-        if (!imageUrl || !/^https?:\/\//i.test(imageUrl)) throw new Error("Invalid image URL");
+        if (!imageUrl || !/^https?:\/\//i.test(imageUrl)) throw new Error("Geçerli bir görsel URL'si gir.");
         classification = await classifyClothingWithLocalVision({ image: imageUrl, imageUrl });
         nextSource = { sourceType: "image_url", imageUrl, sourceUrl: imageUrl, hasVisualImage: true };
       } else {
-        if (!productUrl || !/^https?:\/\//i.test(productUrl)) throw new Error("Invalid product URL");
+        if (!productUrl || !/^https?:\/\//i.test(productUrl)) throw new Error("Geçerli bir ürün URL'si gir.");
         const metadataResponse = await fetch("/api/product-metadata", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -68,7 +68,7 @@ export function AddClothingForm() {
         });
         const metadata = await metadataResponse.json();
         if (!metadataResponse.ok) {
-          throw new Error(metadata.error || "Product image could not be extracted. Please paste a direct image URL manually.");
+          throw new Error(metadata.error || "Ürün görseli alınamadı. Doğrudan görsel URL'si kullanabilirsin.");
         }
         if (metadata.imageUrl) {
           classification = await classifyClothingWithLocalVision({
@@ -87,7 +87,7 @@ export function AddClothingForm() {
           }, "Product image could not be extracted. Classification was estimated from product text. You can upload an image or paste a direct image URL for better visual analysis.");
           nextSource = { sourceType: "product_url", imageUrl: "/placeholder-clothing.svg", sourceUrl: productUrl, hasVisualImage: false };
         } else {
-          throw new Error("Product image could not be extracted. Please paste a direct image URL manually.");
+          throw new Error("Ürün görseli alınamadı. Doğrudan görsel URL'si kullanabilirsin.");
         }
       }
 
@@ -96,14 +96,14 @@ export function AddClothingForm() {
       setPendingSource(nextSource);
       setWarning(
         classification.aiDescription.includes("Product image could not be extracted")
-          ? "Product image could not be extracted. Classification was estimated from product text. You can upload an image or paste a direct image URL for better visual analysis."
+          ? "Ürün görseli alınamadı; tahmin ürün metninden yapıldı."
           : classification.aiDescription.includes("Local vision classifier failed")
-            ? "Local vision classifier failed. Using demo classifier instead."
+            ? "Yerel görsel sınıflandırıcı çalışmadı; demo sınıflandırıcı kullanıldı."
             : "",
       );
-      setMessage("Review classification before saving.");
+      setMessage("Kaydetmeden önce tahmini kontrol et.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Image classification failed");
+      setMessage(error instanceof Error ? error.message : "Görsel sınıflandırılamadı.");
     } finally {
       setLoadingText("");
     }
@@ -111,13 +111,13 @@ export function AddClothingForm() {
 
   async function saveConfirmedItem() {
     if (!draft || !pendingSource) return;
-    setLoadingText("Saving...");
+    setLoadingText("Kaydediliyor...");
     setMessage("");
 
     try {
       let response: Response;
       if (pendingSource.sourceType === "upload") {
-        if (!pendingSource.file) throw new Error("Please upload an image file.");
+        if (!pendingSource.file) throw new Error("Lütfen bir kıyafet görseli yükle.");
         const form = new FormData();
         form.append("image", pendingSource.file);
         form.append("classification", JSON.stringify(draft));
@@ -138,28 +138,38 @@ export function AddClothingForm() {
       }
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Clothing item could not be saved");
+      if (!response.ok) throw new Error(data.error || "Kıyafet dolaba kaydedilemedi.");
       setCreated(data);
       setDraft(null);
       setOriginalPrediction(null);
       setPendingSource(null);
-      setMessage("Item saved to wardrobe.");
+      setMessage("Kıyafet dijital dolaba kaydedildi.");
       setWarning("");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Clothing item could not be saved");
+      setMessage(error instanceof Error ? error.message : "Kıyafet dolaba kaydedilemedi.");
     } finally {
       setLoadingText("");
     }
   }
 
   return (
-    <section className="panel">
-      <h1>Add Clothing</h1>
-      <p>Upload an image, paste a direct image URL, or use a product URL. Local CLIP runs in the browser first, then you review the classification before saving.</p>
+    <section className="page-shell">
+      <div className="page-hero">
+        <div>
+          <span className="eyebrow">Dolabını oluştur</span>
+          <h1 className="hero-title">Kıyafet fotoğrafını ekle, sistem türünü ve etiketlerini tahmin etsin.</h1>
+          <p className="hero-copy">
+            Fotoğraf yükleyebilir, görsel linki verebilir veya ürün linkinden tahmin alabilirsin.
+            Kaydetmeden önce kategori, renk, stil ve mevsim etiketlerini düzeltebilirsin.
+          </p>
+        </div>
+      </div>
+
+      <div className="panel">
       <div className="tabs">
         {(["upload", "image_url", "product_url"] as Mode[]).map((tab) => (
           <button key={tab} className={`tab ${mode === tab ? "active" : ""}`} onClick={() => setMode(tab)}>
-            {tab === "upload" ? "Upload image" : tab === "image_url" ? "Image URL" : "Product URL"}
+            {tab === "upload" ? "Görsel yükle" : tab === "image_url" ? "Görsel linki" : "Ürün linki"}
           </button>
         ))}
       </div>
@@ -167,23 +177,24 @@ export function AddClothingForm() {
       <div style={{ marginTop: 18 }}>
         {mode === "upload" && (
           <label>
-            Image file
+            Kıyafet görseli
             <input type="file" accept="image/*" onChange={(event) => setFile(event.target.files?.[0] || null)} />
           </label>
         )}
         {mode === "image_url" && (
           <label>
-            Direct image URL
+            Doğrudan görsel linki
             <input value={imageUrl} onChange={(event) => setImageUrl(event.target.value)} placeholder="https://example.com/blue-shirt.jpg" />
           </label>
         )}
         {mode === "product_url" && (
           <label>
-            Product or shopping URL
+            Ürün veya alışveriş linki
             <input value={productUrl} onChange={(event) => setProductUrl(event.target.value)} placeholder="https://shop.example.com/product" />
           </label>
         )}
-        <button onClick={classifyForReview} disabled={Boolean(loadingText)}>{loadingText || "Analyze for review"}</button>
+        <button onClick={classifyForReview} disabled={Boolean(loadingText)}>{loadingText || "Analiz et"}</button>
+      </div>
       </div>
 
       {warning && <div className="message error">{warning}</div>}
@@ -196,22 +207,22 @@ export function AddClothingForm() {
           ) : (
             <div className="item-image placeholder-image">No product image extracted</div>
           )}
-          <h2>Review Classification</h2>
-          {draft.confidence < 0.6 && <p className="review-note">Please review classification.</p>}
+          <h2>Tahmini kontrol et</h2>
+          {draft.confidence < 0.6 && <p className="review-note">Tahmin düşük güvenli, lütfen düzelt.</p>}
           <div className="grid two">
-            <label>Name<input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label>
-            <label>Main category<select value={draft.mainCategory} onChange={(event) => setDraft({ ...draft, mainCategory: event.target.value as ClothingClassification["mainCategory"] })}>{MAIN_CATEGORIES.map((category) => <option key={category}>{category}</option>)}</select></label>
-            <label>Subcategory<input value={draft.subCategory} onChange={(event) => setDraft({ ...draft, subCategory: event.target.value })} /></label>
-            <label>Formality<select value={draft.formality} onChange={(event) => setDraft({ ...draft, formality: event.target.value as ClothingClassification["formality"] })}>{FORMALITIES.map((item) => <option key={item}>{item}</option>)}</select></label>
-            <label>Confidence<input type="number" min="0" max="1" step="0.01" value={draft.confidence} onChange={(event) => setDraft({ ...draft, confidence: Number(event.target.value) })} /></label>
+            <label>İsim<input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label>
+            <label>Ana kategori<select value={draft.mainCategory} onChange={(event) => setDraft({ ...draft, mainCategory: event.target.value as ClothingClassification["mainCategory"] })}>{MAIN_CATEGORIES.map((category) => <option key={category}>{category}</option>)}</select></label>
+            <label>Alt kategori<input value={draft.subCategory} onChange={(event) => setDraft({ ...draft, subCategory: event.target.value })} /></label>
+            <label>Kullanım tarzı<select value={draft.formality} onChange={(event) => setDraft({ ...draft, formality: event.target.value as ClothingClassification["formality"] })}>{FORMALITIES.map((item) => <option key={item}>{item}</option>)}</select></label>
+            <label>Güven skoru<input type="number" min="0" max="1" step="0.01" value={draft.confidence} onChange={(event) => setDraft({ ...draft, confidence: Number(event.target.value) })} /></label>
           </div>
-          <ChipGroup label="Colors" options={colorOptions} selected={draft.colors} onToggle={(value) => setDraft({ ...draft, colors: toggleArray(draft.colors, value) })} />
-          <ChipGroup label="Style tags" options={styleOptions} selected={draft.styleTags} onToggle={(value) => setDraft({ ...draft, styleTags: toggleArray(draft.styleTags, value) })} />
-          <ChipGroup label="Season tags" options={seasonOptions} selected={draft.seasonTags} onToggle={(value) => setDraft({ ...draft, seasonTags: toggleArray(draft.seasonTags, value) })} />
-          <label>AI description<textarea value={draft.aiDescription} onChange={(event) => setDraft({ ...draft, aiDescription: event.target.value })} /></label>
+          <ChipGroup label="Renkler" options={colorOptions} selected={draft.colors} onToggle={(value) => setDraft({ ...draft, colors: toggleArray(draft.colors, value) })} />
+          <ChipGroup label="Stil etiketleri" options={styleOptions} selected={draft.styleTags} onToggle={(value) => setDraft({ ...draft, styleTags: toggleArray(draft.styleTags, value) })} />
+          <ChipGroup label="Mevsim etiketleri" options={seasonOptions} selected={draft.seasonTags} onToggle={(value) => setDraft({ ...draft, seasonTags: toggleArray(draft.seasonTags, value) })} />
+          <label>Açıklama<textarea value={draft.aiDescription} onChange={(event) => setDraft({ ...draft, aiDescription: event.target.value })} /></label>
           <div className="actions">
-            <button onClick={saveConfirmedItem} disabled={Boolean(loadingText)}>{loadingText || "Save confirmed item"}</button>
-            <button className="secondary" onClick={() => { setDraft(null); setOriginalPrediction(null); setPendingSource(null); }}>Cancel</button>
+            <button onClick={saveConfirmedItem} disabled={Boolean(loadingText)}>{loadingText || "Dolaba kaydet"}</button>
+            <button className="secondary" onClick={() => { setDraft(null); setOriginalPrediction(null); setPendingSource(null); }}>Vazgeç</button>
           </div>
         </article>
       )}
@@ -220,12 +231,12 @@ export function AddClothingForm() {
         <article className="card" style={{ marginTop: 16 }}>
           <img className="item-image" src={created.imageUrl} alt={created.name} />
           <h3>{created.name}</h3>
-          <p>{created.mainCategory} / {created.subCategory} - confidence {Math.round(created.confidence * 100)}%</p>
-          {created.confidence < 0.6 && <p className="review-note">Please review classification</p>}
+          <p>{created.mainCategory} / {created.subCategory} - güven {Math.round(created.confidence * 100)}%</p>
+          {created.confidence < 0.6 && <p className="review-note">Sınıflandırmayı kontrol et.</p>}
           <div className="tags">{created.styleTags.map((tag) => <span className="tag" key={tag}>{tag}</span>)}</div>
           {created.sourceUrl && (
             <a className="source-link" href={created.sourceUrl} target="_blank" rel="noreferrer" title={created.sourceUrl}>
-              {created.sourceType === "product_url" ? "View product" : `View source${sourceDomain(created.sourceUrl) ? `: ${sourceDomain(created.sourceUrl)}` : ""}`}
+              {created.sourceType === "product_url" ? "Ürünü gör" : `Kaynağı gör${sourceDomain(created.sourceUrl) ? `: ${sourceDomain(created.sourceUrl)}` : ""}`}
             </a>
           )}
         </article>

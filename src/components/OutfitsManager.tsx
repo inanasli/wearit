@@ -11,6 +11,17 @@ type OutfitRow = {
   items: Array<{ clothing?: ClothingItem }>;
 };
 
+const labels: Record<string, string> = {
+  upper: "Üst giyim",
+  lower: "Alt giyim",
+  outerwear: "Dış giyim",
+  shoes: "Ayakkabı",
+  dress: "Elbise",
+  bag: "Çanta",
+  accessory: "Aksesuar",
+  head: "Baş / şapka",
+};
+
 export function OutfitsManager() {
   const [wardrobe, setWardrobe] = useState<ClothingItem[]>([]);
   const [outfits, setOutfits] = useState<OutfitRow[]>([]);
@@ -35,61 +46,82 @@ export function OutfitsManager() {
       body: JSON.stringify({ name, clothingItemIds: selected }),
     });
     if (!response.ok) {
-      setMessage("Outfit could not be saved");
+      setMessage("Kombin kaydedilemedi.");
       return;
     }
     setName("");
     setSelected([]);
-    setMessage("Outfit saved.");
+    setMessage("Kombin kaydedildi. Öneri algoritması bu seçimi zevk örneği olarak kullanacak.");
     refresh();
   }
 
   return (
-    <section className="grid two">
-      <div className="panel">
-        <h1>Outfits</h1>
-        <p>Create manual outfits from wardrobe items. The saved combinations are used by the recommendation score as examples of your taste.</p>
-        <label>Outfit name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="Weekend city outfit" /></label>
-        {MAIN_CATEGORIES.map((category) => {
-          const items = wardrobe.filter((item) => item.mainCategory === category);
-          if (!items.length) return null;
-          return (
-            <div key={category}>
-              <h3>{category}</h3>
-              <div className="grid">
-                {items.map((item) => (
-                  <label className="card" key={item.id}>
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(item.id)}
-                      onChange={(event) => setSelected(event.target.checked ? [...selected, item.id] : selected.filter((id) => id !== item.id))}
-                    />
-                    {item.name} - {item.mainCategory}
-                  </label>
-                ))}
-              </div>
-            </div>
-          );
-        })}
-        <button disabled={!name || selected.length === 0} onClick={saveOutfit}>Save outfit</button>
-        {message && <div className="message">{message}</div>}
-      </div>
-
-      <div className="panel">
-        <h2>Saved outfits</h2>
-        <div className="grid">
-          {outfits.map((outfit) => (
-            <article className="card" key={outfit.id}>
-              <h3>{outfit.name}</h3>
-              <p>Created by {outfit.createdBy}</p>
-              <div className="tags">{outfit.styleTags.map((tag) => <span className="tag" key={tag}>{tag}</span>)}</div>
-              <div className="grid three" style={{ marginTop: 12 }}>
-                {outfit.items.map((row) => row.clothing && <img className="item-image" key={row.clothing.id} src={row.clothing.imageUrl} alt={row.clothing.name} />)}
-              </div>
-            </article>
-          ))}
+    <section className="page-shell">
+      <div className="page-hero">
+        <div>
+          <span className="eyebrow">Kombin hafızası</span>
+          <h1 className="hero-title">Kendi beğendiğin kombinleri kaydet, algoritma zevkini öğrensin.</h1>
+          <p className="hero-copy">
+            Kaydedilen kombinler öneri skorunda referans olarak kullanılır. Böylece sistem yalnızca rastgele eşleştirme yapmaz.
+          </p>
+        </div>
+        <div className="stat-row">
+          <div className="stat"><strong>{outfits.length}</strong><span>kayıtlı kombin</span></div>
+          <div className="stat"><strong>{wardrobe.length}</strong><span>dolap parçası</span></div>
         </div>
       </div>
+
+      <section className="grid two">
+        <div className="panel">
+          <h2>Yeni kombin oluştur</h2>
+          <label>Kombin adı<input value={name} onChange={(event) => setName(event.target.value)} placeholder="Yağmurlu okul günü" /></label>
+          {MAIN_CATEGORIES.map((category) => {
+            const items = wardrobe.filter((item) => item.mainCategory === category);
+            if (!items.length) return null;
+            return (
+              <div key={category}>
+                <h3>{labels[category]}</h3>
+                <div className="grid">
+                  {items.map((item) => (
+                    <label className="card" key={item.id}>
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(item.id)}
+                        onChange={(event) => setSelected(event.target.checked ? [...selected, item.id] : selected.filter((id) => id !== item.id))}
+                      />
+                      <span>{item.name} - {item.colors.join(", ")}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+          <button disabled={!name || selected.length === 0} onClick={saveOutfit}>Kombini kaydet</button>
+          {message && <div className="message">{message}</div>}
+        </div>
+
+        <div className="panel">
+          <h2>Kayıtlı kombinler</h2>
+          {!outfits.length && <div className="empty-state"><p>Henüz kombin kaydedilmedi.</p></div>}
+          <div className="grid">
+            {outfits.map((outfit) => (
+              <article className="card" key={outfit.id}>
+                <h3>{outfit.name}</h3>
+                <p>{outfit.createdBy === "ai" ? "Algoritma önerisi" : "Kullanıcı kaydı"}</p>
+                <div className="tags">{outfit.styleTags.map((tag) => <span className="tag" key={tag}>{tag}</span>)}</div>
+                <div className="outfit-preview" style={{ marginTop: 12 }}>
+                  {outfit.items.map((row) => row.clothing && (
+                    <div key={row.clothing.id}>
+                      <img className="item-thumb" src={row.clothing.imageUrl} alt={row.clothing.name} />
+                      <p>{row.clothing.name}</p>
+                    </div>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
     </section>
   );
 }

@@ -1,8 +1,15 @@
 import { createId } from "@/lib/storage/db";
 import type { ClothingItem, Database, FeedbackType, MainCategory, Outfit, OutfitItem } from "@/lib/types";
 
+export type WeatherContext = {
+  temperature: number;
+  condition: string;
+  precipitation: number;
+};
+
 type ScoreBreakdown = {
   categoryCompleteness: number;
+  weatherSuitability: number;
   styleCompatibility: number;
   stylePreference: number;
   colorCompatibility: number;
@@ -71,8 +78,8 @@ const compatibleColorPairs = new Set([
   "navy-white",
 ]);
 
-export function generateRecommendation(db: Database): GeneratedRecommendation | null {
-  const candidates = scoreCandidates(db);
+export function generateRecommendation(db: Database, weather?: WeatherContext): GeneratedRecommendation | null {
+  const candidates = scoreCandidates(db, weather);
   if (!candidates.length) return null;
 
   const best = candidates[0];
@@ -80,7 +87,7 @@ export function generateRecommendation(db: Database): GeneratedRecommendation | 
   const outfit: Outfit = {
     id: createId("outfit"),
     userId: "demo-user",
-    name: `Recommended ${best.template.join(" + ")}`,
+    name: `Günün kombini: ${best.template.join(" + ")}`,
     description: best.reason,
     styleTags: best.styleTags,
     createdBy: "ai",
@@ -104,7 +111,7 @@ export function generateRecommendation(db: Database): GeneratedRecommendation | 
   };
 }
 
-function scoreCandidates(db: Database) {
+function scoreCandidates(db: Database, weather?: WeatherContext) {
   const byCategory = groupByCategory(db.clothingItems);
   const seen = new Set<string>();
   const dislikedExactKeys = new Set(
@@ -123,7 +130,7 @@ function scoreCandidates(db: Database) {
       seen.add(key);
       return true;
     })
-    .map(({ template, items }) => scoreCandidate(template, items, db))
+    .map(({ template, items }) => scoreCandidate(template, items, db, weather))
     .sort((a, b) => b.score - a.score);
 }
 
@@ -149,7 +156,7 @@ function isValidCandidate(template: MainCategory[], items: ClothingItem[]) {
   return hasRequiredCategories && !combinesDressWithLower && new Set(items.map((item) => item.id)).size === items.length;
 }
 
-function scoreCandidate(template: MainCategory[], items: ClothingItem[], db: Database): ScoredCandidate {
+function scoreCandidate(template: MainCategory[], items: ClothingItem[], db: Database, weather?: WeatherContext): ScoredCandidate {
   const styleTags = unique(items.flatMap((item) => item.styleTags));
   const colors = unique(items.flatMap((item) => item.colors.filter((color) => color !== "unknown").map(normalizeColor)));
   const userSimilarity = maxSimilarityToOutfits(items, db, (outfit) => outfit.createdBy === "user");
@@ -158,6 +165,7 @@ function scoreCandidate(template: MainCategory[], items: ClothingItem[], db: Dat
   const notTodaySimilarity = maxSimilarityToFeedback(items, db, "not_today");
   const breakdown: ScoreBreakdown = {
     categoryCompleteness: 25,
+    weatherSuitability: scoreWeatherSuitability(items, template, weather),
     styleCompatibility: sharedStyleTags(items).length > 0 ? 10 : 0,
     stylePreference: scoreStylePreferences(styleTags, db),
     colorCompatibility: scoreColorCompatibility(colors, items),
@@ -175,7 +183,7 @@ function scoreCandidate(template: MainCategory[], items: ClothingItem[], db: Dat
     template,
     score,
     breakdown,
-    reason: buildReason(styleTags, colors, breakdown),
+    reason: buildReason(styleTags, colors, breakdown, weather),
     styleTags,
     colors,
   };
@@ -253,15 +261,38 @@ function getOutfitItems(outfitId: string, db: Database) {
   return db.clothingItems.filter((item) => ids.includes(item.id));
 }
 
-function buildReason(styleTags: string[], colors: string[], breakdown: ScoreBreakdown) {
+function scoreWeatherSuitability(items: ClothingItem[], template: MainCategory[], weather?: WeatherContext) {
+  if (!weather || Number.isNaN(weather.temperature)) return 0;
+  const temperature = weather.temperature;
+  const condition = weather.condition.toLowerCase();
+  const tags = items.flatMap((item) => item.seasonTags.map((tag) => tag.toLowerCase()));
+  const hasOuterwear = template.includes("outerwear");
+  const hasShoes = template.includes("shoes");
+  const hasWinter = tags.some((tag) => tag.includes("winter") || tag.includes("autumn"));
+  const hasSummer = tags.some((tag) => tag.includes("summer") || tag.includes("spring"));
+  let score = 0;
+
+  if (temperature <= 10) score += hasOuterwear ? 18 : -18;
+  if (temperature > 10 && temperature <= 18) score += hasOuterwear || hasWinter ? 10 : 2;
+  if (temperature >= 24) score += hasSummer && !hasOuterwear ? 14 : hasOuterwear ? -10 : 4;
+  if (temperature > 18 && temperature < 24) score += tags.includes("all_season") || hasSummer ? 8 : 4;
+  if ((condition.includes("rain") || condition.includes("yağmur") || weather.precipitation > 0.2) && hasShoes) score += 8;
+  if ((condition.includes("snow") || condition.includes("kar")) && hasOuterwear) score += 10;
+
+  return Math.max(-20, Math.min(24, score));
+}
+
+function buildReason(styleTags: string[], colors: string[], breakdown: ScoreBreakdown, weather?: WeatherContext) {
   const reasons = [];
+  if (weather && breakdown.weatherSuitability > 0) reasons.push(`${Math.round(weather.temperature)}°C ve ${weather.condition} hava durumuna uygun`);
+  if (weather && breakdown.weatherSuitability < 0) reasons.push("hava durumuna tam uymasa da eldeki parçalar içinde en iyi dengeyi kuruyor");
   if (breakdown.stylePreference > 0) reasons.push(`matches your ${styleTags.slice(0, 3).join(", ")} preferences`);
   if (breakdown.colorCompatibility >= 8) reasons.push(colors.some((color) => neutralColors.has(color)) ? "uses mostly neutral-compatible colors" : "has a coherent color palette");
   if (breakdown.userOutfitSimilarity > 0) reasons.push("is similar to outfits you created");
   if (breakdown.feedbackSimilarity > 0) reasons.push("is similar to outfits you liked before");
   if (breakdown.diversity > 0) reasons.push("adds some variety compared with recent recommendations");
   if (!reasons.length) reasons.push("contains the required wardrobe categories and has the best overall score");
-  return `This outfit was recommended because it ${reasons.join(", and ")}.`;
+  return `Bu kombin ${reasons.join(", ")} olduğu için önerildi.`;
 }
 
 function toCandidateResult(candidate: ScoredCandidate): RecommendationCandidateResult {

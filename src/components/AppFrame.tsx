@@ -17,10 +17,10 @@ export default function AppFrame({ children }: Readonly<{ children: React.ReactN
           Wear It
         </Link>
         <nav>
-          <Link href="/add-clothing">Add Clothing</Link>
-          <Link href="/wardrobe">Wardrobe</Link>
-          <Link href="/outfits">Outfits</Link>
-          <Link href="/recommend">Recommend</Link>
+          <Link href="/add-clothing">Kıyafet Ekle</Link>
+          <Link href="/wardrobe">Dijital Dolap</Link>
+          <Link href="/outfits">Kombinlerim</Link>
+          <Link href="/recommend">Öneri Al</Link>
         </nav>
       </header>
       <main className="app-main">{children}</main>

@@ -1,13 +1,26 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { demoWardrobeItems } from "@/lib/demoWardrobe";
 import { FORMALITIES, MAIN_CATEGORIES, type ClothingItem } from "@/lib/types";
+
+const categoryLabels: Record<string, string> = {
+  head: "Baş / şapka",
+  upper: "Üst giyim",
+  lower: "Alt giyim",
+  dress: "Elbise",
+  outerwear: "Dış giyim",
+  shoes: "Ayakkabı",
+  bag: "Çanta",
+  accessory: "Aksesuar",
+};
 
 export function WardrobeManager() {
   const [items, setItems] = useState<ClothingItem[]>([]);
   const [editing, setEditing] = useState<ClothingItem | null>(null);
   const [filters, setFilters] = useState({ category: "", style: "", color: "" });
   const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     fetchItems();
@@ -18,11 +31,41 @@ export function WardrobeManager() {
     setItems(await response.json());
   }
 
-  const filtered = useMemo(() => items.filter((item) =>
-    (!filters.category || item.mainCategory === filters.category) &&
-    (!filters.style || item.styleTags.includes(filters.style)) &&
-    (!filters.color || item.colors.includes(filters.color))
-  ), [items, filters]);
+  const filtered = useMemo(
+    () =>
+      items.filter(
+        (item) =>
+          (!filters.category || item.mainCategory === filters.category) &&
+          (!filters.style || item.styleTags.includes(filters.style)) &&
+          (!filters.color || item.colors.includes(filters.color)),
+      ),
+    [items, filters],
+  );
+
+  const counts = useMemo(() => {
+    return MAIN_CATEGORIES.reduce<Record<string, number>>((acc, category) => {
+      acc[category] = items.filter((item) => item.mainCategory === category).length;
+      return acc;
+    }, {});
+  }, [items]);
+
+  async function addDemoWardrobe() {
+    setLoading(true);
+    setMessage("");
+    try {
+      for (const item of demoWardrobeItems) {
+        await fetch("/api/clothing", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(item),
+        });
+      }
+      setMessage("Örnek dolap eklendi. Artık hava durumuna göre kombin önerisi alabilirsin.");
+      await fetchItems();
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function saveEdit() {
     if (!editing) return;
@@ -32,11 +75,11 @@ export function WardrobeManager() {
       body: JSON.stringify(editing),
     });
     if (!response.ok) {
-      setMessage("Clothing item could not be saved");
+      setMessage("Kıyafet kaydedilemedi.");
       return;
     }
     setEditing(null);
-    setMessage("Item updated.");
+    setMessage("Kıyafet bilgileri güncellendi.");
     fetchItems();
   }
 
@@ -46,41 +89,81 @@ export function WardrobeManager() {
   }
 
   return (
-    <section className="grid">
+    <section className="page-shell">
+      <div className="page-hero">
+        <div>
+          <span className="eyebrow">Dijital dolap</span>
+          <h1 className="hero-title">Eklediğin kıyafetler kategori, renk, stil ve mevsime göre düzenlenir.</h1>
+          <p className="hero-copy">
+            Öneri algoritması bu etiketleri kullanarak üst, alt, ayakkabı ve gerektiğinde dış giyimden uygun kombin üretir.
+          </p>
+        </div>
+        <div className="stat-row">
+          <div className="stat"><strong>{items.length}</strong><span>kıyafet</span></div>
+          <div className="stat"><strong>{counts.upper || 0}</strong><span>üst</span></div>
+          <div className="stat"><strong>{counts.shoes || 0}</strong><span>ayakkabı</span></div>
+        </div>
+      </div>
+
       <div className="panel">
-        <h1>Wardrobe</h1>
-        <p>Items are grouped by category. AI/mock fields can be corrected manually so the MVP stays reliable even when classification is imperfect.</p>
         <div className="grid three">
-          <label>Category<select value={filters.category} onChange={(e) => setFilters({ ...filters, category: e.target.value })}><option value="">All</option>{MAIN_CATEGORIES.map((cat) => <option key={cat}>{cat}</option>)}</select></label>
-          <label>Style tag<input value={filters.style} onChange={(e) => setFilters({ ...filters, style: e.target.value.toLowerCase() })} placeholder="casual" /></label>
-          <label>Color<input value={filters.color} onChange={(e) => setFilters({ ...filters, color: e.target.value.toLowerCase() })} placeholder="blue" /></label>
+          <label>
+            Kategori
+            <select value={filters.category} onChange={(e) => setFilters({ ...filters, category: e.target.value })}>
+              <option value="">Tümü</option>
+              {MAIN_CATEGORIES.map((cat) => <option key={cat} value={cat}>{categoryLabels[cat]}</option>)}
+            </select>
+          </label>
+          <label>
+            Stil etiketi
+            <input value={filters.style} onChange={(e) => setFilters({ ...filters, style: e.target.value.toLowerCase() })} placeholder="casual" />
+          </label>
+          <label>
+            Renk
+            <input value={filters.color} onChange={(e) => setFilters({ ...filters, color: e.target.value.toLowerCase() })} placeholder="blue" />
+          </label>
+        </div>
+        <div className="actions">
+          <a className="button" href="/add-clothing">Kıyafet ekle</a>
+          <button className="secondary" onClick={addDemoWardrobe} disabled={loading}>
+            {loading ? "Ekleniyor..." : "Örnek dolap yükle"}
+          </button>
         </div>
       </div>
 
       {message && <div className="message">{message}</div>}
 
+      {!filtered.length && (
+        <div className="empty-state">
+          <div>
+            <h2>Dolap henüz boş</h2>
+            <p>Öneri alabilmek için en az bir üst, bir alt ve bir ayakkabı eklemelisin.</p>
+            <div className="actions">
+              <a className="button" href="/add-clothing">İlk kıyafeti ekle</a>
+              <button className="secondary" onClick={addDemoWardrobe} disabled={loading}>Demo verisiyle dene</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {MAIN_CATEGORIES.map((category) => {
         const categoryItems = filtered.filter((item) => item.mainCategory === category);
         if (!categoryItems.length) return null;
         return (
-          <section key={category}>
-            <h2 className="section-title">{category[0].toUpperCase() + category.slice(1)}</h2>
+          <section key={category} className="grid">
+            <h2 className="section-title">{categoryLabels[category]}</h2>
             <div className="grid three">
               {categoryItems.map((item) => (
-                <article className="card" key={item.id}>
+                <article className="card wardrobe-card" key={item.id}>
                   <img className="item-image" src={item.imageUrl} alt={item.name} />
-                  <h3>{item.name}</h3>
-                  <p>{item.mainCategory} / {item.subCategory} - {Math.round(item.confidence * 100)}%</p>
-                  {item.confidence < 0.6 && <p className="review-note">Please review classification</p>}
-                  <div className="tags">{[...item.colors, ...item.styleTags].map((tag) => <span className="tag" key={tag}>{tag}</span>)}</div>
-                  {item.sourceUrl && (
-                    <a className="source-link" href={item.sourceUrl} target="_blank" rel="noreferrer" title={item.sourceUrl}>
-                      {item.sourceType === "product_url" ? "View product" : `View source${sourceDomain(item.sourceUrl) ? `: ${sourceDomain(item.sourceUrl)}` : ""}`}
-                    </a>
-                  )}
-                  <div className="actions" style={{ marginTop: 12 }}>
-                    <button className="secondary" onClick={() => setEditing(item)}>Edit</button>
-                    <button className="danger" onClick={() => remove(item.id)}>Delete</button>
+                  <div>
+                    <h3>{item.name}</h3>
+                    <p>{item.subCategory} - güven {Math.round(item.confidence * 100)}%</p>
+                  </div>
+                  <div className="tags">{[...item.colors, ...item.styleTags, ...item.seasonTags].map((tag) => <span className="tag" key={tag}>{tag}</span>)}</div>
+                  <div className="actions">
+                    <button className="secondary" onClick={() => setEditing(item)}>Düzenle</button>
+                    <button className="danger" onClick={() => remove(item.id)}>Sil</button>
                   </div>
                 </article>
               ))}
@@ -91,19 +174,19 @@ export function WardrobeManager() {
 
       {editing && (
         <section className="panel">
-          <h2>Edit classification</h2>
+          <h2>Kıyafet bilgilerini düzenle</h2>
           <div className="grid two">
-            <label>Name<input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} /></label>
-            <label>Main category<select value={editing.mainCategory} onChange={(e) => setEditing({ ...editing, mainCategory: e.target.value as ClothingItem["mainCategory"] })}>{MAIN_CATEGORIES.map((cat) => <option key={cat}>{cat}</option>)}</select></label>
-            <label>Subcategory<input value={editing.subCategory} onChange={(e) => setEditing({ ...editing, subCategory: e.target.value })} /></label>
-            <label>Formality<select value={editing.formality} onChange={(e) => setEditing({ ...editing, formality: e.target.value as ClothingItem["formality"] })}>{FORMALITIES.map((item) => <option key={item}>{item}</option>)}</select></label>
-            <label>Colors comma-separated<input value={editing.colors.join(", ")} onChange={(e) => setEditing({ ...editing, colors: csv(e.target.value) })} /></label>
-            <label>Style tags comma-separated<input value={editing.styleTags.join(", ")} onChange={(e) => setEditing({ ...editing, styleTags: csv(e.target.value) })} /></label>
-            <label>Season tags comma-separated<input value={editing.seasonTags.join(", ")} onChange={(e) => setEditing({ ...editing, seasonTags: csv(e.target.value) })} /></label>
+            <label>İsim<input value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} /></label>
+            <label>Ana kategori<select value={editing.mainCategory} onChange={(e) => setEditing({ ...editing, mainCategory: e.target.value as ClothingItem["mainCategory"] })}>{MAIN_CATEGORIES.map((cat) => <option key={cat}>{cat}</option>)}</select></label>
+            <label>Alt kategori<input value={editing.subCategory} onChange={(e) => setEditing({ ...editing, subCategory: e.target.value })} /></label>
+            <label>Kullanım tarzı<select value={editing.formality} onChange={(e) => setEditing({ ...editing, formality: e.target.value as ClothingItem["formality"] })}>{FORMALITIES.map((item) => <option key={item}>{item}</option>)}</select></label>
+            <label>Renkler<input value={editing.colors.join(", ")} onChange={(e) => setEditing({ ...editing, colors: csv(e.target.value) })} /></label>
+            <label>Stil etiketleri<input value={editing.styleTags.join(", ")} onChange={(e) => setEditing({ ...editing, styleTags: csv(e.target.value) })} /></label>
+            <label>Mevsim etiketleri<input value={editing.seasonTags.join(", ")} onChange={(e) => setEditing({ ...editing, seasonTags: csv(e.target.value) })} /></label>
           </div>
           <div className="actions">
-            <button onClick={saveEdit}>Save changes</button>
-            <button className="secondary" onClick={() => setEditing(null)}>Cancel</button>
+            <button onClick={saveEdit}>Kaydet</button>
+            <button className="secondary" onClick={() => setEditing(null)}>Vazgeç</button>
           </div>
         </section>
       )}
@@ -113,12 +196,4 @@ export function WardrobeManager() {
 
 function csv(value: string) {
   return value.split(",").map((item) => item.trim().toLowerCase()).filter(Boolean);
-}
-
-function sourceDomain(value: string) {
-  try {
-    return new URL(value).hostname.replace(/^www\./, "");
-  } catch {
-    return "";
-  }
 }
