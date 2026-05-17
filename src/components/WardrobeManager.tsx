@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { demoWardrobeItems } from "@/lib/demoWardrobe";
 import { FORMALITIES, MAIN_CATEGORIES, type ClothingItem } from "@/lib/types";
 
@@ -16,6 +17,8 @@ const categoryLabels: Record<string, string> = {
 };
 
 export function WardrobeManager() {
+  const searchParams = useSearchParams();
+  const categoryParam = searchParams.get("category") || "";
   const [items, setItems] = useState<ClothingItem[]>([]);
   const [editing, setEditing] = useState<ClothingItem | null>(null);
   const [filters, setFilters] = useState({ category: "", style: "", color: "" });
@@ -25,6 +28,12 @@ export function WardrobeManager() {
   useEffect(() => {
     fetchItems();
   }, []);
+
+  useEffect(() => {
+    if (categoryParam && MAIN_CATEGORIES.includes(categoryParam as never)) {
+      setFilters((current) => ({ ...current, category: categoryParam }));
+    }
+  }, [categoryParam]);
 
   async function fetchItems() {
     const response = await fetch("/api/clothing");
@@ -128,6 +137,11 @@ export function WardrobeManager() {
           <button className="secondary" onClick={addDemoWardrobe} disabled={loading}>
             {loading ? "Ekleniyor..." : "Örnek dolap yükle"}
           </button>
+          {filters.category && (
+            <button className="secondary" onClick={() => setFilters({ ...filters, category: "" })}>
+              Filtreyi temizle
+            </button>
+          )}
         </div>
       </div>
 
@@ -136,10 +150,10 @@ export function WardrobeManager() {
       {!filtered.length && (
         <div className="empty-state">
           <div>
-            <h2>Dolap henüz boş</h2>
+            <h2>{filters.category ? `${categoryLabels[filters.category]} boş` : "Dolap henüz boş"}</h2>
             <p>Öneri alabilmek için en az bir üst, bir alt ve bir ayakkabı eklemelisin.</p>
             <div className="actions">
-              <a className="button" href="/add-clothing">İlk kıyafeti ekle</a>
+              <a className="button" href="/add-clothing">Kıyafet ekle</a>
               <button className="secondary" onClick={addDemoWardrobe} disabled={loading}>Demo verisiyle dene</button>
             </div>
           </div>
@@ -150,7 +164,7 @@ export function WardrobeManager() {
         const categoryItems = filtered.filter((item) => item.mainCategory === category);
         if (!categoryItems.length) return null;
         return (
-          <section key={category} className="grid">
+          <section key={category} className="grid" id={category}>
             <h2 className="section-title">{categoryLabels[category]}</h2>
             <div className="grid three">
               {categoryItems.map((item) => (

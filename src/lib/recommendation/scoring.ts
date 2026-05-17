@@ -54,6 +54,7 @@ const templates: MainCategory[][] = [
   ["upper", "lower", "shoes"],
   ["dress", "shoes"],
   ["upper", "lower", "outerwear", "shoes"],
+  ["dress", "outerwear", "shoes"],
   ["upper", "lower", "shoes", "accessory"],
   ["upper", "lower", "shoes", "bag"],
 ];
@@ -87,7 +88,7 @@ export function generateRecommendation(db: Database, weather?: WeatherContext): 
   const outfit: Outfit = {
     id: createId("outfit"),
     userId: "demo-user",
-    name: `Günün kombini: ${best.template.join(" + ")}`,
+    name: `Günün kombini: ${templateName(best.template)}`,
     description: best.reason,
     styleTags: best.styleTags,
     createdBy: "ai",
@@ -273,10 +274,11 @@ function scoreWeatherSuitability(items: ClothingItem[], template: MainCategory[]
   let score = 0;
 
   if (temperature <= 10) score += hasOuterwear ? 18 : -18;
-  if (temperature > 10 && temperature <= 18) score += hasOuterwear || hasWinter ? 10 : 2;
-  if (temperature >= 24) score += hasSummer && !hasOuterwear ? 14 : hasOuterwear ? -10 : 4;
+  if (temperature <= 5) score += hasOuterwear ? 10 : -12;
+  if (temperature > 10 && temperature <= 18) score += hasOuterwear || hasWinter ? 14 : -2;
+  if (temperature >= 24) score += hasSummer && !hasOuterwear ? 16 : hasOuterwear ? -18 : 6;
   if (temperature > 18 && temperature < 24) score += tags.includes("all_season") || hasSummer ? 8 : 4;
-  if ((condition.includes("rain") || condition.includes("yağmur") || weather.precipitation > 0.2) && hasShoes) score += 8;
+  if ((condition.includes("rain") || condition.includes("yağmur") || weather.precipitation > 0.2) && hasShoes) score += hasOuterwear ? 12 : 5;
   if ((condition.includes("snow") || condition.includes("kar")) && hasOuterwear) score += 10;
 
   return Math.max(-20, Math.min(24, score));
@@ -285,14 +287,28 @@ function scoreWeatherSuitability(items: ClothingItem[], template: MainCategory[]
 function buildReason(styleTags: string[], colors: string[], breakdown: ScoreBreakdown, weather?: WeatherContext) {
   const reasons = [];
   if (weather && breakdown.weatherSuitability > 0) reasons.push(`${Math.round(weather.temperature)}°C ve ${weather.condition} hava durumuna uygun`);
-  if (weather && breakdown.weatherSuitability < 0) reasons.push("hava durumuna tam uymasa da eldeki parçalar içinde en iyi dengeyi kuruyor");
-  if (breakdown.stylePreference > 0) reasons.push(`matches your ${styleTags.slice(0, 3).join(", ")} preferences`);
-  if (breakdown.colorCompatibility >= 8) reasons.push(colors.some((color) => neutralColors.has(color)) ? "uses mostly neutral-compatible colors" : "has a coherent color palette");
-  if (breakdown.userOutfitSimilarity > 0) reasons.push("is similar to outfits you created");
-  if (breakdown.feedbackSimilarity > 0) reasons.push("is similar to outfits you liked before");
-  if (breakdown.diversity > 0) reasons.push("adds some variety compared with recent recommendations");
-  if (!reasons.length) reasons.push("contains the required wardrobe categories and has the best overall score");
+  if (weather && breakdown.weatherSuitability < 0) reasons.push("eldeki parçalar içinde hava durumuna en yakın dengeyi kuruyor");
+  if (breakdown.stylePreference > 0) reasons.push(`${styleTags.slice(0, 3).join(", ")} stil tercihinle uyumlu`);
+  if (breakdown.colorCompatibility >= 8) reasons.push(colors.some((color) => neutralColors.has(color)) ? "nötr renklerle kolay uyum sağlıyor" : "renk paleti dengeli");
+  if (breakdown.userOutfitSimilarity > 0) reasons.push("daha önce kaydettiğin kombinlere benziyor");
+  if (breakdown.feedbackSimilarity > 0) reasons.push("beğendiğin kombinlere yakın");
+  if (breakdown.diversity > 0) reasons.push("son önerilere göre biraz çeşitlilik katıyor");
+  if (!reasons.length) reasons.push("gerekli kıyafet kategorilerini tamamlıyor ve en yüksek skoru alıyor");
   return `Bu kombin ${reasons.join(", ")} olduğu için önerildi.`;
+}
+
+function templateName(template: MainCategory[]) {
+  const labels: Record<MainCategory, string> = {
+    head: "baş",
+    upper: "üst",
+    lower: "alt",
+    dress: "elbise",
+    outerwear: "dış giyim",
+    shoes: "ayakkabı",
+    bag: "çanta",
+    accessory: "aksesuar",
+  };
+  return template.map((item) => labels[item]).join(" + ");
 }
 
 function toCandidateResult(candidate: ScoredCandidate): RecommendationCandidateResult {

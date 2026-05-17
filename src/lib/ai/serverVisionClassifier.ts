@@ -20,25 +20,56 @@ type ZeroShotClassifier = (image: string, labels: string[], options?: { hypothes
 const MODEL_ID = "Xenova/clip-vit-base-patch32";
 
 const clothingLabels = [
+  "polo shirt",
   "t-shirt",
+  "long sleeve shirt",
   "shirt",
   "blouse",
+  "tank top",
+  "crop top",
   "sweater",
+  "sweatshirt",
   "hoodie",
+  "cardigan",
+  "denim jacket",
+  "leather jacket",
   "jacket",
+  "trench coat",
   "coat",
   "blazer",
+  "suit",
+  "vest",
+  "evening dress",
+  "summer dress",
   "dress",
+  "mini skirt",
+  "midi skirt",
+  "maxi skirt",
   "skirt",
   "jeans",
+  "denim pants",
+  "cargo pants",
+  "wide leg pants",
+  "leggings",
+  "sweatpants",
   "pants",
   "trousers",
   "shorts",
+  "running shoes",
+  "white sneakers",
   "sneakers",
+  "loafers",
   "boots",
+  "ankle boots",
   "heels",
   "sandals",
+  "slippers",
+  "backpack",
+  "tote bag",
+  "shoulder bag",
   "handbag",
+  "belt",
+  "scarf",
   "hat",
 ];
 
@@ -70,25 +101,56 @@ const styleLabels = [
 ];
 
 const categoryMap: Record<string, MainCategory> = {
+  "polo shirt": "upper",
   "t-shirt": "upper",
+  "long sleeve shirt": "upper",
   shirt: "upper",
   blouse: "upper",
+  "tank top": "upper",
+  "crop top": "upper",
   sweater: "upper",
+  sweatshirt: "upper",
   hoodie: "upper",
+  cardigan: "outerwear",
+  "denim jacket": "outerwear",
+  "leather jacket": "outerwear",
   jacket: "outerwear",
+  "trench coat": "outerwear",
   coat: "outerwear",
   blazer: "outerwear",
+  suit: "outerwear",
+  vest: "outerwear",
+  "evening dress": "dress",
+  "summer dress": "dress",
   dress: "dress",
+  "mini skirt": "lower",
+  "midi skirt": "lower",
+  "maxi skirt": "lower",
   skirt: "lower",
   jeans: "lower",
+  "denim pants": "lower",
+  "cargo pants": "lower",
+  "wide leg pants": "lower",
+  leggings: "lower",
+  sweatpants: "lower",
   pants: "lower",
   trousers: "lower",
   shorts: "lower",
+  "running shoes": "shoes",
+  "white sneakers": "shoes",
   sneakers: "shoes",
+  loafers: "shoes",
   boots: "shoes",
+  "ankle boots": "shoes",
   heels: "shoes",
   sandals: "shoes",
+  slippers: "shoes",
+  backpack: "bag",
+  "tote bag": "bag",
+  "shoulder bag": "bag",
   handbag: "bag",
+  belt: "accessory",
+  scarf: "accessory",
   hat: "head",
 };
 
@@ -137,7 +199,7 @@ export async function classifyClothingWithServerVision(input: ClassifyInput): Pr
       throw new Error("Server vision model could not classify the clothing item confidently.");
     }
 
-    const subCategory = topClothing.label;
+    const subCategory = normalizeSubCategory(topClothing.label, clothing);
     const mainCategory = categoryMap[subCategory] || "accessory";
     const selectedColors = selectColors(colors);
     const styleTags = selectStyles(styles, subCategory);
@@ -152,7 +214,7 @@ export async function classifyClothingWithServerVision(input: ClassifyInput): Pr
       seasonTags: detectSeasonTags(subCategory),
       formality,
       aiDescription: "Server-side CLIP vision classification completed from the uploaded image.",
-      confidence: Number(Math.min(0.94, Math.max(0.35, topClothing.score + 0.18)).toFixed(2)),
+      confidence: Number(Math.min(0.94, Math.max(0.35, topClothing.score + 0.16)).toFixed(2)),
     });
   } finally {
     if (prepared.cleanupPath) {
@@ -201,6 +263,26 @@ function selectColors(results: ZeroShotResult) {
   );
 }
 
+function normalizeSubCategory(label: string, clothing: ZeroShotResult) {
+  const labels = clothing.slice(0, 5).map((item) => item.label);
+  if (label === "shirt" && labels.includes("t-shirt")) {
+    const shirt = clothing.find((item) => item.label === "shirt")?.score || 0;
+    const tshirt = clothing.find((item) => item.label === "t-shirt")?.score || 0;
+    if (shirt - tshirt < 0.18) return "t-shirt";
+  }
+  if (label === "pants" && labels.includes("jeans")) {
+    const pants = clothing.find((item) => item.label === "pants")?.score || 0;
+    const jeans = clothing.find((item) => item.label === "jeans")?.score || 0;
+    if (pants - jeans < 0.12) return "jeans";
+  }
+  if (label === "jacket" && labels.includes("blazer")) {
+    const jacket = clothing.find((item) => item.label === "jacket")?.score || 0;
+    const blazer = clothing.find((item) => item.label === "blazer")?.score || 0;
+    if (jacket - blazer < 0.1) return "blazer";
+  }
+  return label;
+}
+
 function selectStyles(results: ZeroShotResult, subCategory: string) {
   const top = results[0]?.score || 0;
   const tags = results
@@ -209,22 +291,23 @@ function selectStyles(results: ZeroShotResult, subCategory: string) {
     .map((result) => styleMap[result.label])
     .filter(Boolean);
 
-  if (["sneakers", "hoodie"].includes(subCategory)) tags.push("sporty", "casual");
-  if (["blazer", "trousers"].includes(subCategory)) tags.push("smart_casual", "classic");
-  if (["t-shirt", "jeans"].includes(subCategory)) tags.push("casual", "basic");
+  if (["sneakers", "white sneakers", "running shoes", "hoodie", "sweatshirt"].includes(subCategory)) tags.push("sporty", "casual");
+  if (["blazer", "trousers", "wide leg pants", "loafers"].includes(subCategory)) tags.push("smart_casual", "classic");
+  if (["t-shirt", "polo shirt", "jeans", "denim pants"].includes(subCategory)) tags.push("casual", "basic");
+  if (["dress", "evening dress", "heels"].includes(subCategory)) tags.push("elegant");
   return unique(tags).slice(0, 5);
 }
 
 function detectFormality(subCategory: string, styleTags: string[]): Formality {
-  if (["blazer", "heels"].includes(subCategory) || styleTags.includes("formal")) return "formal";
-  if (["trousers", "dress", "coat"].includes(subCategory) || styleTags.includes("smart_casual")) return "smart_casual";
-  if (["sneakers", "hoodie"].includes(subCategory) || styleTags.includes("sporty")) return "sporty";
+  if (["blazer", "suit", "heels", "evening dress"].includes(subCategory) || styleTags.includes("formal")) return "formal";
+  if (["trousers", "wide leg pants", "dress", "coat", "loafers"].includes(subCategory) || styleTags.includes("smart_casual")) return "smart_casual";
+  if (["sneakers", "white sneakers", "running shoes", "hoodie", "sweatshirt"].includes(subCategory) || styleTags.includes("sporty")) return "sporty";
   return "casual";
 }
 
 function detectSeasonTags(subCategory: string) {
-  if (["coat", "sweater", "hoodie", "boots"].includes(subCategory)) return ["autumn", "winter"];
-  if (["t-shirt", "shorts", "sandals"].includes(subCategory)) return ["spring", "summer"];
+  if (["coat", "trench coat", "sweater", "sweatshirt", "hoodie", "boots", "ankle boots", "scarf"].includes(subCategory)) return ["autumn", "winter"];
+  if (["t-shirt", "tank top", "crop top", "shorts", "sandals", "slippers", "summer dress"].includes(subCategory)) return ["spring", "summer"];
   return ["all_season"];
 }
 
