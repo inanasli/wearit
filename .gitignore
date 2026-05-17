@@ -5,6 +5,7 @@ dist
 .env*
 !.env.example
 data/*.json
+!data/wearit-db.json
 public/uploads/*
 !public/uploads/.gitkeep
 npm-debug.log*
