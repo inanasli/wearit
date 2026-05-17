@@ -10,6 +10,7 @@ interface WardrobeShelfItemProps {
   kind: WardrobeShelfKind;
   href: string;
   className: string;
+  imageUrls?: string[];
 }
 
 export default function WardrobeShelfItem({
@@ -18,6 +19,7 @@ export default function WardrobeShelfItem({
   kind,
   href,
   className,
+  imageUrls = [],
 }: WardrobeShelfItemProps) {
   return (
     <Link
@@ -30,7 +32,7 @@ export default function WardrobeShelfItem({
       <span className="absolute inset-0 opacity-[0.1] [background-image:repeating-linear-gradient(90deg,rgba(255,255,255,.15)_0_1px,transparent_1px_18px)]" />
 
       <span className="absolute inset-x-3 bottom-12 top-3 grid place-items-center rounded-lg bg-black/12">
-        <CategoryIllustration kind={kind} />
+        {imageUrls.length ? <WardrobePhotoStack imageUrls={imageUrls} title={title} /> : <CategoryIllustration kind={kind} />}
       </span>
 
       <span className="absolute inset-x-2 bottom-2 rounded-lg border border-amber-100/14 bg-black/48 px-2.5 py-1.5 text-center shadow-[0_8px_18px_rgba(0,0,0,0.35)] backdrop-blur">
@@ -42,6 +44,26 @@ export default function WardrobeShelfItem({
         </span>
       </span>
     </Link>
+  );
+}
+
+function WardrobePhotoStack({ imageUrls, title }: { imageUrls: string[]; title: string }) {
+  return (
+    <span className="relative grid h-full w-full grid-cols-2 gap-1.5 p-2">
+      {imageUrls.slice(0, 4).map((imageUrl, index) => (
+        <span
+          key={`${imageUrl}-${index}`}
+          className="relative overflow-hidden rounded-lg border border-amber-100/15 bg-[#f4eadb] shadow-[0_14px_18px_rgba(0,0,0,0.3)] transition duration-500 group-hover:-translate-y-0.5"
+        >
+          <img
+            src={imageUrl}
+            alt={`${title} parçası`}
+            className="h-full w-full object-contain p-1.5"
+          />
+          <span className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.14),transparent_50%,rgba(0,0,0,0.14))]" />
+        </span>
+      ))}
+    </span>
   );
 }
 

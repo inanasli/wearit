@@ -402,6 +402,49 @@ button:disabled {
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
 }
 
+.weekly-plan {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+}
+
+.week-card {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  min-height: 260px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffdf8;
+  padding: 14px;
+}
+
+.week-card h3 {
+  font-size: 16px;
+  margin-bottom: 0;
+}
+
+.week-card p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.week-items {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.week-items img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: #f2ebe1;
+  padding: 4px;
+}
+
 .weather-box {
   display: grid;
   gap: 12px;

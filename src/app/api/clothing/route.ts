@@ -1,4 +1,4 @@
-import { demoUserId, jsonError } from "@/lib/api";
+import { demoUserId, jsonError, normalizeClassification } from "@/lib/api";
 import { createClassificationCorrectionLog } from "@/lib/classificationCorrections";
 import { createId, readDb, updateDb } from "@/lib/storage/db";
 import type { ClothingClassification, ClothingItem } from "@/lib/types";
@@ -13,8 +13,10 @@ export async function POST(request: Request) {
     const body = await request.json();
     const now = new Date().toISOString();
     const originalClassification = body.originalClassification as ClothingClassification | null | undefined;
+    const classification = normalizeClassification(body);
     const item: ClothingItem = {
       ...body,
+      ...classification,
       originalClassification: originalClassification || null,
       id: createId("clothing"),
       userId: demoUserId,

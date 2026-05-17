@@ -25,6 +25,10 @@ type RecommendationResult = {
   }>;
 };
 
+type WeeklyRecommendation = RecommendationResult & {
+  dayLabel: string;
+};
+
 const scoreLabels: Record<string, string> = {
   categoryCompleteness: "Kategori tamamlığı",
   weatherSuitability: "Hava uyumu",
@@ -43,9 +47,13 @@ export function RecommendPanel() {
   const [preferences, setPreferences] = useState<UserStylePreference[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [result, setResult] = useState<RecommendationResult | null>(null);
+  const [weeklyPlan, setWeeklyPlan] = useState<WeeklyRecommendation[]>([]);
   const [wardrobe, setWardrobe] = useState<ClothingItem[]>([]);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [weeklyLoading, setWeeklyLoading] = useState(false);
+  const [feedbackLoading, setFeedbackLoading] = useState<"like" | "not_today" | "dislike" | null>(null);
+  const [weeklyWeather, setWeeklyWeather] = useState<WeatherState[]>([]);
   const [weather, setWeather] = useState<WeatherState>({
     temperature: 14,
     condition: "yağmur olasılığı",
@@ -82,17 +90,26 @@ export function RecommendPanel() {
 
     try {
       const response = await fetch(
-        `https://api.open-meteo.com/v1/forecast?latitude=${coords.latitude}&longitude=${coords.longitude}&current=temperature_2m,precipitation,weather_code&timezone=auto`,
+        `https://api.open-meteo.com/v1/forecast?latitude=${coords.latitude}&longitude=${coords.longitude}&current=temperature_2m,precipitation,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weather_code&forecast_days=7&timezone=auto`,
       );
       const data = await response.json();
-      setWeather({
+      const currentWeather = {
         temperature: Math.round(data.current.temperature_2m),
         precipitation: Number(data.current.precipitation || 0),
         condition: weatherCodeToText(Number(data.current.weather_code)),
         source: coords.label,
-      });
+      };
+      setWeather(currentWeather);
+      const dailyWeather = (data.daily?.time || []).map((_: string, index: number) => ({
+        temperature: Math.round(((data.daily.temperature_2m_max?.[index] || currentWeather.temperature) + (data.daily.temperature_2m_min?.[index] || currentWeather.temperature)) / 2),
+        precipitation: Number(data.daily.precipitation_sum?.[index] || 0),
+        condition: weatherCodeToText(Number(data.daily.weather_code?.[index] || data.current.weather_code)),
+        source: coords.label,
+      }));
+      setWeeklyWeather(dailyWeather.length ? dailyWeather : buildFallbackWeek(currentWeather));
     } catch {
       setMessage("Hava durumu alınamadı; manuel değerlerle öneri oluşturabilirsin.");
+      setWeeklyWeather(buildFallbackWeek(weather));
     }
   }
 
@@ -123,6 +140,7 @@ export function RecommendPanel() {
   async function generate() {
     setLoading(true);
     setMessage("");
+    setWeeklyPlan([]);
     const response = await fetch("/api/recommendations/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -139,19 +157,54 @@ export function RecommendPanel() {
     await refresh();
   }
 
-  async function feedback(feedbackType: "like" | "not_today" | "dislike") {
-    if (!result) return;
-    const response = await fetch(`/api/recommendations/${result.recommendation.id}/feedback`, {
+  async function generateWeekly() {
+    setWeeklyLoading(true);
+    setMessage("");
+    const week = weeklyWeather.length ? weeklyWeather : buildFallbackWeek(weather);
+    const response = await fetch("/api/recommendations/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ feedbackType }),
+      body: JSON.stringify({ weather, weeklyWeather: week, days: 7 }),
     });
+    const data = await response.json();
+    setWeeklyLoading(false);
     if (!response.ok) {
-      setMessage("Geri bildirim kaydedilemedi.");
+      setMessage(data.error || "Haftalık öneri oluşturulamadı.");
+      setWeeklyPlan([]);
       return;
     }
-    setMessage("Geri bildirim kaydedildi; sonraki öneriler buna göre güncellenecek.");
-    refresh();
+    const plan = data.weeklyPlan || [];
+    setWeeklyPlan(plan);
+    setResult(plan[0] || null);
+    await refresh();
+  }
+
+  async function feedback(feedbackType: "like" | "not_today" | "dislike") {
+    if (!result) return;
+    setFeedbackLoading(feedbackType);
+    setMessage("");
+    try {
+      const response = await fetch(`/api/recommendations/${result.recommendation.id}/feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ feedbackType }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setMessage(data.error || "Geri bildirim kaydedilemedi.");
+        return;
+      }
+      setMessage(
+        feedbackType === "dislike"
+          ? "Beğenmediğin kaydedildi; bu kombin ve benzerleri sonraki önerilerde geriye düşecek."
+          : "Geri bildirim kaydedildi; sonraki öneriler buna göre güncellenecek.",
+      );
+      await refresh();
+    } catch {
+      setMessage("Geri bildirim kaydedilemedi. Sunucu bağlantısını kontrol et.");
+    } finally {
+      setFeedbackLoading(null);
+    }
   }
 
   const recommendedItems = useMemo(
@@ -214,7 +267,7 @@ export function RecommendPanel() {
         </div>
       </section>
 
-      {message && <div className={`message ${message.includes("oluşturulamadı") || message.includes("Please") ? "error" : ""}`}>{message}</div>}
+      {message && <div className={`message ${message.includes("oluşturulamadı") || message.includes("kaydedilemedi") || message.includes("Please") ? "error" : ""}`}>{message}</div>}
 
       <section className="grid two">
         <div className="panel">
@@ -234,7 +287,12 @@ export function RecommendPanel() {
           {hasMinimumWardrobe && (
             <>
               <p>Sistem dolabındaki olası kombinleri kendisi üretir, skorlar ve en uygun olanı seçer.</p>
-              <button onClick={generate} disabled={loading}>{loading ? "Hesaplanıyor..." : "Kombini otomatik seç"}</button>
+              <div className="actions">
+                <button onClick={generate} disabled={loading || weeklyLoading}>{loading ? "Hesaplanıyor..." : "Bugünün kombinini seç"}</button>
+                <button className="secondary" onClick={generateWeekly} disabled={loading || weeklyLoading}>
+                  {weeklyLoading ? "Hafta hazırlanıyor..." : "Bu hafta giyebileceklerim"}
+                </button>
+              </div>
             </>
           )}
         </div>
@@ -261,16 +319,55 @@ export function RecommendPanel() {
               </div>
               {result.recommendation.scoreBreakdown && <ScoreBreakdown rows={result.recommendation.scoreBreakdown} />}
               <div className="actions">
-                <button onClick={() => feedback("like")}>Beğendim</button>
-                <button className="secondary" onClick={() => feedback("not_today")}>Bugün değil</button>
-                <button className="danger" onClick={() => feedback("dislike")}>Beğenmedim</button>
+                <button type="button" onClick={() => feedback("like")} disabled={Boolean(feedbackLoading)}>
+                  {feedbackLoading === "like" ? "Kaydediliyor..." : "Beğendim"}
+                </button>
+                <button type="button" className="secondary" onClick={() => feedback("not_today")} disabled={Boolean(feedbackLoading)}>
+                  {feedbackLoading === "not_today" ? "Kaydediliyor..." : "Bugün değil"}
+                </button>
+                <button type="button" className="danger" onClick={() => feedback("dislike")} disabled={Boolean(feedbackLoading)}>
+                  {feedbackLoading === "dislike" ? "Kaydediliyor..." : "Beğenmedim"}
+                </button>
               </div>
             </article>
           )}
         </div>
       </section>
+
+      {weeklyPlan.length > 0 && (
+        <section className="panel">
+          <h2>Bu hafta giyebileceklerin</h2>
+          <div className="weekly-plan">
+            {weeklyPlan.map((day) => {
+              const dayItems = day.outfitItems.map((row) => wardrobe.find((item) => item.id === row.clothingItemId)).filter(Boolean) as ClothingItem[];
+              return (
+                <article className="week-card" key={day.recommendation.id}>
+                  <div>
+                    <span className="tag weather">{day.dayLabel}</span>
+                    <span className="tag score">{Math.round(day.weather?.temperature ?? weather.temperature)}°C · {day.weather?.condition || weather.condition}</span>
+                  </div>
+                  <h3>{day.outfit.name.replace(/^Bugün kombini: |^Yarın kombini: |^[^:]+ kombini: /, "")}</h3>
+                  <div className="week-items">
+                    {dayItems.map((item) => (
+                      <img key={item.id} src={item.imageUrl} alt={item.name} title={item.name} />
+                    ))}
+                  </div>
+                  <p>{day.recommendation.reason}</p>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </section>
   );
+}
+
+function buildFallbackWeek(weather: WeatherState) {
+  return Array.from({ length: 7 }, (_, index) => ({
+    ...weather,
+    temperature: weather.temperature + ([0, 1, -1, 2, 0, -2, 1][index] || 0),
+  }));
 }
 
 function ScoreBreakdown({ rows }: { rows: Record<string, number> }) {

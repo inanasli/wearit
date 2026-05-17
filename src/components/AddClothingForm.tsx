@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { classifyClothingWithLocalVision } from "@/lib/ai/localVisionClassifier";
+import { normalizeClassification } from "@/lib/api";
 import { FORMALITIES, MAIN_CATEGORIES, type ClothingClassification, type ClothingItem, type SourceType } from "@/lib/types";
 
 type Mode = "upload" | "image_url" | "product_url";
@@ -102,7 +103,8 @@ export function AddClothingForm() {
         nextSource = { sourceType: "product_url", imageUrl: data.imageUrl || "/placeholder-clothing.svg", sourceUrl: productUrl, hasVisualImage: Boolean(data.imageUrl) };
       }
 
-      setDraft(classification);
+      const reviewedClassification = normalizeClassification(classification);
+      setDraft(reviewedClassification);
       setOriginalPrediction(JSON.parse(JSON.stringify(classification)));
       setPendingSource(nextSource);
       setWarning(

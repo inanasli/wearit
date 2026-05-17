@@ -1,7 +1,9 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useEffect, useMemo, useState } from "react";
 import WardrobeShelfItem, { type WardrobeShelfKind } from "@/components/WardrobeShelfItem";
+import type { ClothingItem } from "@/lib/types";
 
 interface WardrobeInteriorProps {
   isOpen: boolean;
@@ -52,6 +54,24 @@ const shelves: Array<{
 ];
 
 export default function WardrobeInterior({ isOpen }: WardrobeInteriorProps) {
+  const [items, setItems] = useState<ClothingItem[]>([]);
+
+  useEffect(() => {
+    fetch("/api/clothing")
+      .then((response) => response.json())
+      .then(setItems)
+      .catch(() => setItems([]));
+  }, []);
+
+  const previews = useMemo(() => {
+    const grouped: Record<string, string[]> = {};
+    for (const item of items) {
+      const key = item.mainCategory === "bag" ? "accessory" : item.mainCategory;
+      grouped[key] = [...(grouped[key] || []), item.imageUrl].slice(0, 4);
+    }
+    return grouped;
+  }, [items]);
+
   return (
     <motion.div
       className="absolute inset-[34px] overflow-hidden rounded-t-[8.6rem] rounded-b-[1.2rem] border border-amber-100/12 bg-[linear-gradient(180deg,#170d09_0%,#2b170e_54%,#120806_100%)] shadow-inner shadow-black/80 sm:inset-[42px] sm:rounded-t-[10.2rem]"
@@ -77,7 +97,7 @@ export default function WardrobeInterior({ isOpen }: WardrobeInteriorProps) {
           animate={{ opacity: isOpen ? 1 : 0, y: isOpen ? 0 : 10 }}
           transition={{ duration: 0.5, delay: isOpen ? 0.18 + index * 0.05 : 0 }}
         >
-          <WardrobeShelfItem {...shelf} />
+          <WardrobeShelfItem {...shelf} imageUrls={previews[shelf.kind] || []} />
         </motion.div>
       ))}
     </motion.div>

@@ -143,8 +143,14 @@ function scoreCandidates(db: Database, weather?: WeatherContext) {
       .map((feedback) => outfitKey(getOutfitItems(feedback.outfitId, db).map((item) => item.id)))
       .filter(Boolean),
   );
+  const recentExactKeys = new Set(
+    db.recommendations
+      .slice(-6)
+      .map((recommendation) => outfitKey(getOutfitItems(recommendation.outfitId, db).map((item) => item.id)))
+      .filter(Boolean),
+  );
 
-  return templates
+  const candidates = templates
     .flatMap((template) => buildCandidates(template, byCategory).map((items) => ({ template, items })))
     .filter(({ template, items }) => isValidCandidate(template, items))
     .filter(({ items }) => {
@@ -152,7 +158,10 @@ function scoreCandidates(db: Database, weather?: WeatherContext) {
       if (seen.has(key) || dislikedExactKeys.has(key)) return false;
       seen.add(key);
       return true;
-    })
+    });
+
+  const freshCandidates = candidates.filter(({ items }) => !recentExactKeys.has(outfitKey(items.map((item) => item.id))));
+  return (freshCandidates.length ? freshCandidates : candidates)
     .map(({ template, items }) => scoreCandidate(template, items, db, weather))
     .sort((a, b) => b.score - a.score);
 }
@@ -191,7 +200,7 @@ function scoreCandidate(template: MainCategory[], items: ClothingItem[], db: Dat
     weatherSuitability: scoreWeatherSuitability(items, template, weather),
     styleCompatibility: scoreStyleCompatibility(items),
     formalityCompatibility: scoreFormalityCompatibility(items),
-    stylePreference: scoreStylePreferences(styleTags, db),
+    stylePreference: scoreStylePreferences(items, db),
     colorCompatibility: scoreColorCompatibility(colors, items),
     colorPreference: scoreColorPreferences(colors, db),
     userOutfitSimilarity: userSimilarity >= 0.45 ? 10 : userSimilarity >= 0.25 ? 5 : 0,
@@ -213,14 +222,26 @@ function scoreCandidate(template: MainCategory[], items: ClothingItem[], db: Dat
   };
 }
 
-function scoreStylePreferences(styleTags: string[], db: Database) {
-  let score = 0;
+function scoreStylePreferences(items: ClothingItem[], db: Database) {
+  const activePrefs = db.preferences.filter((pref) => pref.weight > 0);
+  if (!activePrefs.length) return 0;
+
+  const preferredTags = new Set(activePrefs.map((pref) => pref.styleTag));
+  const matchedItems = items.filter((item) => item.styleTags.some((tag) => preferredTags.has(tag))).length;
+  const matchedTags = unique(items.flatMap((item) => item.styleTags.filter((tag) => preferredTags.has(tag))));
+  const matchRatio = matchedItems / items.length;
+
+  let score = Math.round(matchRatio * 32 + matchedTags.length * 4);
+  if (matchedItems === items.length) score += 10;
+  if (matchedItems === 0) score -= 24;
+
   for (const pref of db.preferences) {
-    if (!styleTags.includes(pref.styleTag)) continue;
-    if (pref.weight > 0) score += 15 * Math.min(pref.weight, 2);
-    if (pref.weight < 0) score -= 10 * Math.min(Math.abs(pref.weight), 2);
+    if (pref.weight >= 0) continue;
+    const hasDislikedStyle = items.some((item) => item.styleTags.includes(pref.styleTag));
+    if (hasDislikedStyle) score -= 12 * Math.min(Math.abs(pref.weight), 2);
   }
-  return Math.round(score);
+
+  return Math.max(-30, Math.min(52, score));
 }
 
 function scoreColorPreferences(colors: string[], db: Database) {
@@ -260,12 +281,36 @@ function scoreStyleCompatibility(items: ClothingItem[]) {
     bestFamilyScore = Math.max(bestFamilyScore, matches);
   }
 
-  if (shared.length >= 2) return 16;
-  if (shared.length === 1) return 12;
-  if (bestFamilyScore === items.length) return 10;
-  if (bestFamilyScore >= Math.max(2, items.length - 1)) return 7;
-  if (tags.includes("formal") && tags.includes("sporty")) return -8;
-  return 0;
+  let score = 0;
+  if (shared.length >= 2) score += 16;
+  else if (shared.length === 1) score += 12;
+  else if (bestFamilyScore === items.length) score += 10;
+  else if (bestFamilyScore >= Math.max(2, items.length - 1)) score += 7;
+
+  score += scoreOutfitCoherence(items);
+  if (tags.includes("formal") && tags.includes("sporty")) score -= 12;
+  return Math.max(-35, Math.min(22, score));
+}
+
+function scoreOutfitCoherence(items: ClothingItem[]) {
+  const has = (category: MainCategory, pattern: RegExp) =>
+    items.some((item) => item.mainCategory === category && pattern.test(itemText(item)));
+  const hasCategory = (category: MainCategory) => items.some((item) => item.mainCategory === category);
+  const allText = items.map(itemText).join(" ");
+  let score = 0;
+
+  if (has("dress", /\b(evening|satin|formal|gown|mini)\b/) && has("shoes", /\b(sneaker|running|sport)\b/)) score -= 20;
+  if (has("lower", /\b(skirt|etek)\b/) && has("upper", /\b(hoodie|sweatshirt|sport)\b/)) score -= 12;
+  if (has("upper", /\b(tank|crop|cami|askılı|askili)\b/) && has("outerwear", /\b(coat|trench|winter)\b/)) score -= 10;
+  if (has("upper", /\b(blouse|shirt|sweater|kazak|gömlek|gomlek)\b/) && has("lower", /\b(trousers|wide leg|pantolon|midi skirt)\b/)) score += 8;
+  if (has("upper", /\b(t-shirt|tee|basic)\b/) && has("lower", /\b(jeans|denim|pants)\b/) && has("shoes", /\b(sneaker)\b/)) score += 8;
+  if (has("outerwear", /\b(blazer|jacket|ceket)\b/) && has("lower", /\b(trousers|wide leg|pantolon|skirt|etek)\b/)) score += 8;
+  if (hasCategory("dress") && has("shoes", /\b(heel|loafer|boot|bot|sandal)\b/)) score += 6;
+  if (/\b(patterned|multicolor|colorful)\b/.test(allText) && items.filter((item) => item.colors.some((color) => neutralColors.has(normalizeColor(color)))).length === 0) {
+    score -= 8;
+  }
+
+  return score;
 }
 
 function scoreFormalityCompatibility(items: ClothingItem[]) {
@@ -285,11 +330,15 @@ function scoreFormalityCompatibility(items: ClothingItem[]) {
 }
 
 function scoreDiversity(items: ClothingItem[], db: Database) {
-  const recentOutfitIds = db.recommendations.slice(-5).map((recommendation) => recommendation.outfitId);
+  const recentOutfitIds = db.recommendations.slice(-8).map((recommendation) => recommendation.outfitId);
   const recentItemIds = new Set(
     db.outfitItems.filter((row) => recentOutfitIds.includes(row.outfitId)).map((row) => row.clothingItemId),
   );
-  return items.some((item) => recentItemIds.has(item.id)) ? 0 : 5;
+  const repeatedCount = items.filter((item) => recentItemIds.has(item.id)).length;
+  if (repeatedCount === 0) return 14;
+  if (repeatedCount === 1) return -8;
+  if (repeatedCount === 2) return -18;
+  return -30;
 }
 
 function maxSimilarityToFeedback(items: ClothingItem[], db: Database, feedbackType: FeedbackType) {
@@ -330,17 +379,92 @@ function scoreWeatherSuitability(items: ClothingItem[], template: MainCategory[]
   const hasShoes = template.includes("shoes");
   const hasWinter = tags.some((tag) => tag.includes("winter") || tag.includes("autumn"));
   const hasSummer = tags.some((tag) => tag.includes("summer") || tag.includes("spring"));
+  const isWet = isWetWeather(weather);
+  const hasDress = template.includes("dress");
+  const shoes = items.filter((item) => item.mainCategory === "shoes");
   let score = 0;
 
-  if (temperature <= 10) score += hasOuterwear ? 18 : -18;
-  if (temperature <= 5) score += hasOuterwear ? 10 : -12;
-  if (temperature > 10 && temperature <= 18) score += hasOuterwear || hasWinter ? 14 : -2;
-  if (temperature >= 24) score += hasSummer && !hasOuterwear ? 16 : hasOuterwear ? -18 : 6;
+  if (temperature <= 10) score += hasOuterwear ? 22 : -30;
+  if (temperature <= 5) score += hasOuterwear && hasWinter ? 14 : -18;
+  if (temperature > 10 && temperature <= 18) score += hasOuterwear || hasWinter ? 16 : -4;
+  if (temperature >= 24) score += hasSummer && !hasOuterwear ? 18 : hasOuterwear ? -24 : 8;
   if (temperature > 18 && temperature < 24) score += tags.includes("all_season") || hasSummer ? 8 : 4;
-  if ((condition.includes("rain") || condition.includes("yağmur") || weather.precipitation > 0.2) && hasShoes) score += hasOuterwear ? 12 : 5;
-  if ((condition.includes("snow") || condition.includes("kar")) && hasOuterwear) score += 10;
 
-  return Math.max(-20, Math.min(24, score));
+  if (isWet && hasShoes) {
+    score += hasOuterwear ? 18 : -26;
+    score += shoes.some(isWeatherResistantShoe) ? 16 : shoes.some(isOpenOrLightShoe) ? -24 : -8;
+    if (hasDress && !hasOuterwear) score -= 22;
+    if (hasDress && items.some(isSummerOrLightItem)) score -= 16;
+  }
+
+  if ((condition.includes("snow") || condition.includes("kar")) && hasOuterwear) score += 10;
+  score += items.reduce((sum, item) => sum + scoreItemForWeather(item, weather), 0);
+
+  return Math.max(-60, Math.min(55, score));
+}
+
+function scoreItemForWeather(item: ClothingItem, weather: WeatherContext) {
+  const temperature = weather.temperature;
+  const tags = item.seasonTags.map((tag) => tag.toLowerCase());
+  const text = itemText(item);
+  let score = 0;
+
+  if (temperature <= 10) {
+    if (tags.some((tag) => tag.includes("winter") || tag.includes("autumn"))) score += 8;
+    if (isSummerOrLightItem(item)) score -= 18;
+  }
+
+  if (temperature >= 24) {
+    if (tags.some((tag) => tag.includes("summer") || tag.includes("spring"))) score += 7;
+    if (item.mainCategory === "outerwear" || text.includes("sweater") || text.includes("kazak")) score -= 16;
+  }
+
+  if (isWetWeather(weather)) {
+    if (item.mainCategory === "outerwear") score += 10;
+    if (item.mainCategory === "dress" && isSummerOrLightItem(item)) score -= 18;
+    if (item.mainCategory === "shoes" && isWeatherResistantShoe(item)) score += 12;
+    if (item.mainCategory === "shoes" && isOpenOrLightShoe(item)) score -= 18;
+  }
+
+  return score;
+}
+
+function isWetWeather(weather: WeatherContext) {
+  const condition = weather.condition.toLowerCase();
+  return (
+    condition.includes("rain") ||
+    condition.includes("yağmur") ||
+    condition.includes("wet") ||
+    condition.includes("storm") ||
+    condition.includes("fırtına") ||
+    weather.precipitation > 0.2
+  );
+}
+
+function isSummerOrLightItem(item: ClothingItem) {
+  const text = itemText(item);
+  return (
+    item.seasonTags.some((tag) => ["summer", "spring"].includes(tag.toLowerCase())) ||
+    text.includes("tank") ||
+    text.includes("askılı") ||
+    text.includes("t-shirt") ||
+    text.includes("mini") ||
+    text.includes("sandal")
+  );
+}
+
+function isWeatherResistantShoe(item: ClothingItem) {
+  const text = itemText(item);
+  return text.includes("boot") || text.includes("bot") || text.includes("leather") || text.includes("deri");
+}
+
+function isOpenOrLightShoe(item: ClothingItem) {
+  const text = itemText(item);
+  return text.includes("sandal") || text.includes("heel") || text.includes("stiletto") || text.includes("sneaker");
+}
+
+function itemText(item: ClothingItem) {
+  return `${item.name} ${item.subCategory} ${item.styleTags.join(" ")} ${item.aiDescription}`.toLowerCase();
 }
 
 function buildReason(styleTags: string[], colors: string[], breakdown: ScoreBreakdown, weather?: WeatherContext) {
