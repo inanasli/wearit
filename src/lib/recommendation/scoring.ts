@@ -11,6 +11,7 @@ type ScoreBreakdown = {
   categoryCompleteness: number;
   weatherSuitability: number;
   styleCompatibility: number;
+  formalityCompatibility: number;
   stylePreference: number;
   colorCompatibility: number;
   colorPreference: number;
@@ -77,7 +78,28 @@ const compatibleColorPairs = new Set([
   "gray-pink",
   "green-brown",
   "navy-white",
+  "navy-beige",
+  "navy-gray",
+  "cream-brown",
+  "cream-blue",
+  "white-green",
+  "black-blue",
 ]);
+
+const clashingColorPairs = new Set([
+  "red-green",
+  "red-orange",
+  "pink-red",
+  "purple-orange",
+  "yellow-purple",
+  "green-purple",
+]);
+
+const styleFamilies: Record<string, string[]> = {
+  casual: ["casual", "basic", "comfortable", "streetwear", "sporty"],
+  smart: ["smart_casual", "minimal", "classic", "elegant", "formal"],
+  summer: ["summer", "bohemian", "colorful", "comfortable", "casual"],
+};
 
 export function generateRecommendation(db: Database, weather?: WeatherContext): GeneratedRecommendation | null {
   const candidates = scoreCandidates(db, weather);
@@ -167,7 +189,8 @@ function scoreCandidate(template: MainCategory[], items: ClothingItem[], db: Dat
   const breakdown: ScoreBreakdown = {
     categoryCompleteness: 25,
     weatherSuitability: scoreWeatherSuitability(items, template, weather),
-    styleCompatibility: sharedStyleTags(items).length > 0 ? 10 : 0,
+    styleCompatibility: scoreStyleCompatibility(items),
+    formalityCompatibility: scoreFormalityCompatibility(items),
     stylePreference: scoreStylePreferences(styleTags, db),
     colorCompatibility: scoreColorCompatibility(colors, items),
     colorPreference: scoreColorPreferences(colors, db),
@@ -217,12 +240,48 @@ function scoreColorCompatibility(colors: string[], items: ClothingItem[]) {
     [...item.styleTags, item.subCategory, item.name].some((value) => /pattern|print|floral|colorful|bohemian/i.test(value)),
   );
 
-  if (strongCount >= 4 && neutralCount === 0) return -8;
-  if (neutralCount >= Math.max(1, colors.length - 1)) return 10;
-  if (hasCompatibleColors(colors)) return 8;
-  if (hasPatternedItem && neutralCount >= 1) return 5;
-  if (colors.length <= 3) return 8;
+  if (hasClashingColors(colors) && neutralCount === 0) return -14;
+  if (strongCount >= 3 && neutralCount === 0) return -10;
+  if (neutralCount >= Math.max(1, colors.length - 1)) return 14;
+  if (hasCompatibleColors(colors)) return 12;
+  if (hasPatternedItem && neutralCount >= 1) return 8;
+  if (colors.length <= 2) return 9;
+  if (colors.length <= 3 && neutralCount >= 1) return 6;
+  return -2;
+}
+
+function scoreStyleCompatibility(items: ClothingItem[]) {
+  const tags = unique(items.flatMap((item) => item.styleTags));
+  const shared = sharedStyleTags(items);
+  let bestFamilyScore = 0;
+
+  for (const familyTags of Object.values(styleFamilies)) {
+    const matches = items.filter((item) => item.styleTags.some((tag) => familyTags.includes(tag))).length;
+    bestFamilyScore = Math.max(bestFamilyScore, matches);
+  }
+
+  if (shared.length >= 2) return 16;
+  if (shared.length === 1) return 12;
+  if (bestFamilyScore === items.length) return 10;
+  if (bestFamilyScore >= Math.max(2, items.length - 1)) return 7;
+  if (tags.includes("formal") && tags.includes("sporty")) return -8;
   return 0;
+}
+
+function scoreFormalityCompatibility(items: ClothingItem[]) {
+  const formalityRank: Record<string, number> = {
+    sporty: 0,
+    casual: 1,
+    unknown: 1,
+    smart_casual: 2,
+    formal: 3,
+  };
+  const ranks = items.map((item) => formalityRank[item.formality] ?? 1);
+  const spread = Math.max(...ranks) - Math.min(...ranks);
+  if (spread === 0) return 10;
+  if (spread === 1) return 7;
+  if (spread === 2) return -4;
+  return -10;
 }
 
 function scoreDiversity(items: ClothingItem[], db: Database) {
@@ -288,6 +347,7 @@ function buildReason(styleTags: string[], colors: string[], breakdown: ScoreBrea
   const reasons = [];
   if (weather && breakdown.weatherSuitability > 0) reasons.push(`${Math.round(weather.temperature)}°C ve ${weather.condition} hava durumuna uygun`);
   if (weather && breakdown.weatherSuitability < 0) reasons.push("eldeki parçalar içinde hava durumuna en yakın dengeyi kuruyor");
+  if (breakdown.formalityCompatibility >= 7) reasons.push("parçaların günlük/formal seviyesi birbirine yakın");
   if (breakdown.stylePreference > 0) reasons.push(`${styleTags.slice(0, 3).join(", ")} stil tercihinle uyumlu`);
   if (breakdown.colorCompatibility >= 8) reasons.push(colors.some((color) => neutralColors.has(color)) ? "nötr renklerle kolay uyum sağlıyor" : "renk paleti dengeli");
   if (breakdown.userOutfitSimilarity > 0) reasons.push("daha önce kaydettiğin kombinlere benziyor");
@@ -342,6 +402,10 @@ function sharedStyleTags(items: ClothingItem[]) {
 
 function hasCompatibleColors(colors: string[]) {
   return colors.some((a) => colors.some((b) => a !== b && compatibleColorPairs.has([a, b].sort().join("-"))));
+}
+
+function hasClashingColors(colors: string[]) {
+  return colors.some((a) => colors.some((b) => a !== b && clashingColorPairs.has([a, b].sort().join("-"))));
 }
 
 function normalizeColor(color: string) {

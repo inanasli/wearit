@@ -29,6 +29,7 @@ const scoreLabels: Record<string, string> = {
   categoryCompleteness: "Kategori tamamlığı",
   weatherSuitability: "Hava uyumu",
   styleCompatibility: "Stil uyumu",
+  formalityCompatibility: "Tarz seviyesi",
   stylePreference: "Stil tercihi",
   colorCompatibility: "Renk uyumu",
   colorPreference: "Renk tercihi",

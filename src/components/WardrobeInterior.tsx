@@ -1,45 +1,51 @@
 "use client";
 
 import { motion } from "framer-motion";
-import WardrobeShelfItem from "@/components/WardrobeShelfItem";
+import WardrobeShelfItem, { type WardrobeShelfKind } from "@/components/WardrobeShelfItem";
 
 interface WardrobeInteriorProps {
   isOpen: boolean;
 }
 
-const shelves = [
+const shelves: Array<{
+  title: string;
+  subtitle: string;
+  kind: WardrobeShelfKind;
+  href: string;
+  className: string;
+}> = [
   {
     title: "Üst Giyim",
     subtitle: "tişört, gömlek, kazak",
-    imageSrc: "/wardrobe/categories/tshirt/tshirt.png",
+    kind: "upper",
     href: "/wardrobe?category=upper",
-    className: "left-[9%] top-[18%] h-[25%] w-[38%]",
+    className: "left-[9%] top-[17%] h-[25%] w-[38%]",
   },
   {
     title: "Dış Giyim",
     subtitle: "ceket, kaban, blazer",
-    imageSrc: "/wardrobe/categories/jacket/jacket.png",
+    kind: "outerwear",
     href: "/wardrobe?category=outerwear",
-    className: "right-[9%] top-[18%] h-[25%] w-[38%]",
+    className: "right-[9%] top-[17%] h-[25%] w-[38%]",
   },
   {
     title: "Alt Giyim",
     subtitle: "pantolon, jean, etek",
-    imageSrc: "/placeholder-clothing.svg",
+    kind: "lower",
     href: "/wardrobe?category=lower",
-    className: "left-[9%] top-[49%] h-[20%] w-[38%]",
+    className: "left-[9%] top-[48%] h-[21%] w-[38%]",
   },
   {
     title: "Ayakkabılar",
-    subtitle: "sneaker, bot, topuklu",
-    imageSrc: "/placeholder-clothing.svg",
+    subtitle: "sneaker, bot, loafer",
+    kind: "shoes",
     href: "/wardrobe?category=shoes",
-    className: "right-[9%] top-[49%] h-[20%] w-[38%]",
+    className: "right-[9%] top-[48%] h-[21%] w-[38%]",
   },
   {
     title: "Çanta & Aksesuar",
     subtitle: "çanta, şapka, takı",
-    imageSrc: "/placeholder-clothing.svg",
+    kind: "accessory",
     href: "/wardrobe?category=bag",
     className: "left-[9%] right-[9%] bottom-[8%] h-[17%]",
   },
@@ -60,9 +66,9 @@ export default function WardrobeInterior({ isOpen }: WardrobeInteriorProps) {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_15%,rgba(255,220,154,0.25),transparent_26%),linear-gradient(90deg,rgba(255,255,255,0.045),transparent_18%,transparent_82%,rgba(0,0,0,0.28))]" />
       <div className="absolute inset-0 opacity-[0.13] [background-image:repeating-linear-gradient(90deg,rgba(255,255,255,.1)_0_1px,transparent_1px_22px)]" />
 
-      <div className="absolute left-[7%] right-[7%] top-[46%] h-px bg-amber-100/18" />
+      <div className="absolute left-[7%] right-[7%] top-[45%] h-px bg-amber-100/18" />
       <div className="absolute left-[7%] right-[7%] top-[72%] h-px bg-amber-100/15" />
-      <div className="absolute left-1/2 top-[16%] h-[55%] w-px -translate-x-1/2 bg-amber-100/12" />
+      <div className="absolute left-1/2 top-[15%] h-[56%] w-px -translate-x-1/2 bg-amber-100/12" />
 
       {shelves.map((shelf, index) => (
         <motion.div
